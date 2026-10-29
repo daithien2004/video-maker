@@ -1,0 +1,10 @@
+vieneu
+gradio
+soundfile
+numpy
+requests
+pillow
+playwright
+fastapi
+uvicorn
+python-multipart

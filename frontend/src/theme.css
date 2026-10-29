@@ -1,0 +1,104 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  color-scheme: light;
+  --radius: .75rem;
+  --background: #f7f7f8;
+  --foreground: #111113;
+  --card: #ffffff;
+  --card-foreground: #111113;
+  --popover: #ffffff;
+  --popover-foreground: #111113;
+  --primary: #111113;
+  --primary-foreground: #ffffff;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #27272a;
+  --muted: #f4f4f5;
+  --muted-foreground: #6b6b74;
+  --accent: #f2f2f3;
+  --accent-foreground: #111113;
+  --destructive: #b42318;
+  --destructive-foreground: #ffffff;
+  --border: #e7e7ea;
+  --input: #d6d6db;
+  --ring: #111113;
+  --success: #187449;
+  --success-soft: #eef7f1;
+  --warning: #8b520e;
+  --warning-soft: #fdf7ec;
+  --destructive-soft: #fdf0ef;
+  --sidebar: #ffffff;
+  --shadow: 0 1px 2px #00000008, 0 14px 34px -18px #0000001c;
+  --shadow-soft: 0 1px 2px #00000006, 0 6px 16px -12px #00000012;
+  --shadow-lift: 0 2px 4px #0000000a, 0 24px 48px -24px #0000002b;
+  --ring-soft: color-mix(in srgb, var(--ring) 12%, transparent);
+  --primary-hover: #2c2c30;
+}
+
+.dark {
+  color-scheme: dark;
+  --background: #0c0c0e;
+  --foreground: #f4f4f5;
+  --card: #141416;
+  --card-foreground: #f4f4f5;
+  --popover: #18181b;
+  --popover-foreground: #f4f4f5;
+  --primary: #fafafa;
+  --primary-foreground: #111113;
+  --secondary: #232326;
+  --secondary-foreground: #e4e4e7;
+  --muted: #1c1c1f;
+  --muted-foreground: #a1a1aa;
+  --accent: #232326;
+  --accent-foreground: #fafafa;
+  --destructive: #ff9b93;
+  --destructive-foreground: #2a0f0c;
+  --border: #2a2a2e;
+  --input: #3f3f46;
+  --ring: #d4d4d8;
+  --success: #9de3b9;
+  --success-soft: #1d332a;
+  --warning: #f2ce8a;
+  --warning-soft: #332c21;
+  --destructive-soft: #382524;
+  --sidebar: #101012;
+  --shadow: 0 1px 2px #00000030, 0 18px 40px -20px #00000066;
+  --shadow-soft: 0 1px 2px #00000024, 0 8px 20px -14px #00000052;
+  --shadow-lift: 0 2px 6px #00000038, 0 28px 56px -26px #00000080;
+  --ring-soft: color-mix(in srgb, var(--ring) 20%, transparent);
+  --primary-hover: #e4e4e7;
+}
+
+@layer base {
+  * { @apply border-border outline-ring/50; }
+  body { @apply bg-background text-foreground; }
+}

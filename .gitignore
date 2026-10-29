@@ -1,0 +1,24 @@
+# Môi trường chạy & công cụ
+.venv/
+ffmpeg/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Dữ liệu chạy, đầu ra, cấu hình máy
+work/
+output/
+config/settings.json
+
+# Media nặng, ảnh chụp bài viết
+assets/memes/
+assets/illus/
+
+# Hệ điều hành
+.DS_Store
+Thumbs.db
+*.log

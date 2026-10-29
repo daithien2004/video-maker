@@ -1,0 +1,95 @@
+VIDEO MAKER - Kịch bản -> giọng đọc -> chữ to -> clip meme + nền -> MP4 dọc 1080x1920
+==========================================================================================
+
+GIAO DIỆN HIỆN TẠI: REACT STUDIO
+Mở bằng run.bat. Hướng dẫn mới: docs/GIAO_DIEN_REACT.md và docs/CAU_TRUC.md.
+Các mục giao diện Gradio phía dưới được giữ để tham khảo bản cũ.
+
+1) CÀI ĐẶT (làm 1 lần, cần Internet)
+------------------------------------
+ a. Giải nén cả thư mục này ra chỗ bạn muốn (ví dụ D:\VideoMaker). Đường dẫn càng ngắn, không dấu càng tốt.
+ b. Cài Python 3.11 nếu máy chưa có: https://www.python.org/downloads/windows/
+    Khi cài NHỚ tick ô "Add python.exe to PATH".
+ c. Bấm đúp install.bat. Nó sẽ tự: tạo môi trường, cài thư viện (có giọng đọc VieNeu-TTS), tải FFmpeg.
+    Mất khoảng 5-15 phút tùy mạng.
+ d. Bấm đúp run.bat -> trình duyệt tự mở giao diện (địa chỉ http://127.0.0.1:7860).
+    Muốn tắt ứng dụng: đóng cửa sổ đen.
+
+2) CHẠY THỬ NGAY (chưa cần model giọng)
+---------------------------------------
+ Tab "Làm video" -> mở mục "Giọng đọc" -> chọn "Chế độ thử (tiếng bíp...)" -> bấm
+ "1. Phân tích kịch bản" -> "2. Xem thử nhanh". Đã có sẵn 1 nền mẫu và 2 clip mẫu để thử bố cục.
+ Chữ tiếng Việt có dấu hiện đúng với font mặc định "Segoe UI Black" của Windows.
+
+3) DÙNG GIỌNG THẬT
+------------------
+ Mục "Giọng đọc" -> chọn "Giọng thật (VieNeu-TTS)" -> bấm "Tải danh sách giọng".
+ LẦN ĐẦU nó tải model từ Internet (vài trăm MB) nên hơi lâu. Từ lần sau chạy offline.
+ Chọn giọng, bấm "Nghe thử" để nghe trước. Nghe kỹ các câu có SỐ, TÊN RIÊNG, TỪ TIẾNG ANH vì TTS hay sai ở đây;
+ sai thì viết lại lời đọc (ví dụ viết "một trăm nghìn" thay cho "100K") và dùng || để chữ hiển thị vẫn là 100K.
+ Máy có card NVIDIA hay không cũng chạy được: giọng đọc chạy bằng CPU là đủ.
+
+4) VIẾT KỊCH BẢN
+----------------
+ Mỗi dòng là một nhịp (một lần đổi chữ + có thể đổi clip meme):
+
+   [sốc] Bình thường thì trong giới giải trí, mọi thứ đều rất êm đềm
+   [im lặng] Thứ duy nhất bạn cần làm là im lặng
+   Một trăm nghìn người đã xem || 100K người đã xem
+
+ - [thẻ]  : thẻ cảm xúc để chọn clip meme (không phân biệt hoa/thường và dấu: [sốc] = [SOC] = [soc]).
+ - ||     : phần trước là lời đọc, phần sau là chữ hiển thị.
+ - Chữ hiện dần theo cụm ngắn ("Số từ tối đa mỗi lần hiện"), và app ưu tiên ngắt sau dấu câu nên không
+   cắt giữa cụm: "Năm 1960, Ông A làm gì đó" (3 từ/cụm) -> "Năm 1960," | "Ông A làm" | "gì đó".
+   Số luôn dính với từ đứng trước ("Năm 1960", "tập 5"), không bị tách thành "Năm" | "1960".
+ - Dòng bắt đầu bằng # là ghi chú, bị bỏ qua.
+ - Thẻ cảm xúc của giọng đọc như [cười] đặt ở GIỮA dòng (hoặc sau thẻ clip: "[sốc] [cười] ..."). Tính năng này
+   của VieNeu còn thử nghiệm.
+
+5) THƯ VIỆN CLIP / NỀN
+----------------------
+ Có 2 cách thêm: tab "Thư viện" (tải lên) hoặc tự chép file vào thư mục:
+   assets\memes\<tên thẻ>\file.mp4      (ví dụ assets\memes\soc\clip1.mp4  ->  thẻ [sốc])
+   assets\backgrounds\                  (video nền Minecraft parkour..., nên dài 5 phút trở lên; app cắt đoạn ngẫu nhiên)
+   assets\music\                        (nhạc nền, tùy chọn)
+   assets\fonts\                        (font riêng .ttf/.otf; gõ đúng TÊN FONT vào ô "Tên font")
+ Clip meme có thể là video (mp4, mov, webm, gif) hoặc ảnh (png, jpg, webp). Clip ngắn hơn câu sẽ tự lặp lại.
+ Hãy XÓA clip mẫu (assets\memes\soc\mau.mp4 ...) và nền mẫu khi bạn đã có đồ của mình.
+
+6) CÁCH LÀM MỘT VIDEO
+---------------------
+ 1. Dán kịch bản -> "1. Phân tích kịch bản". App tách dòng và tự gán clip theo thẻ.
+ 2. Xem bảng: đổi clip bằng cách gõ tên file ở cột cuối (để trống = không clip); sửa lời đọc/chữ nếu cần.
+ 2b. Muốn chỉnh chữ / bố cục mà KHÔNG phải xuất video: mở mục "🎨 Bố cục & chữ", gõ câu vào ô
+    "Câu xem thử" rồi bấm "👁 Xem thử bố cục" -> có ảnh 1 khung hình ngay (khoảng 1 giây, không cần
+    giọng đọc), kèm danh sách các cụm chữ video sẽ hiện. Ưng rồi mới xuất video.
+ 3. "2. Xem thử nhanh" (bản nhẹ 540x960) -> thấy ổn thì "3. Xuất video đẹp".
+ 4. Video xuất ra nằm trong thư mục output\ (H.264, 1080x1920, 30fps, CRF 18, âm thanh AAC 192k) - đăng thẳng lên TikTok được.
+ 5. Không phải chỉnh lại thông số mỗi lần mở: app TỰ LƯU mọi thông số (giọng, tốc độ, font, cỡ chữ,
+    màu, vị trí khung meme, nhạc nền...) và cả kịch bản vào file config/settings.json ngay khi bạn đổi.
+    Mở lại app là có sẵn như lần trước. Có nút "Lưu cấu hình" để lưu ngay và xem thông báo.
+    Muốn quay về mặc định: đóng app rồi xóa file config/settings.json trong thư mục này.
+
+7) GẶP LỖI
+----------
+ - "Không tìm thấy FFmpeg": chạy lại install.bat. Hoặc FFmpeg thủ công: tải bản "full/essentials build" cho Windows,
+   giải nén, chép file ffmpeg.exe và ffprobe.exe vào thư mục ffmpeg\ nằm cạnh run.bat.
+ - Tab "Kiểm tra máy" -> "Kiểm tra cài đặt": cho biết FFmpeg, chữ (libass), thư viện giọng đọc có ổn không.
+ - Chữ không hiện / chữ vuông: đổi "Tên font" sang font Windows có dấu tiếng Việt (ví dụ "Arial", "Segoe UI Black").
+ - Xuất bằng GPU (NVENC) báo lỗi: tắt ô đó, app dùng CPU (chậm hơn một chút nhưng chắc chắn chạy).
+ - Chữ đổi hơi lệch nhịp giọng: bản này chia thời gian chữ theo độ dài từ trong mỗi dòng nên chỉ gần đúng;
+   dòng ngắn thì sát hơn. Muốn sát từng từ thì cần thêm bước căn bằng Whisper (chưa có trong bản này).
+
+8) LƯU Ý BẢN QUYỀN
+------------------
+ Clip cắt từ phim, MV, show truyền hình có chủ sở hữu bản quyền. App không giải quyết việc này; hãy tự kiểm tra
+ điều khoản của nơi bạn tải clip và của nền tảng đăng video. Video Minecraft: kiểm tra chính sách của nhà phát hành
+ nếu kênh có kiếm tiền. Chỉ nhân bản/dùng giọng khi có quyền.
+
+9) CHẾ ĐỘ PHÁT TRIỂN (hot reload)
+---------------------------------
+ - run.bat     : chạy bình thường. Sửa app.py thì phải đóng cửa sổ đen rồi bấm run.bat lại.
+ - run_dev.bat : đang mở thì sửa app.py hoặc pipeline.py, LƯU file là app tự khởi động lại sau ~1 giây.
+                 Không cần tắt/mở; chỉ cần F5 lại trang web. Tiện lúc đang sửa giao diện.
+                 Lưu ý: đừng lưu file lúc đang xuất video (app sẽ khởi động lại giữa chừng, phải làm lại).
+                 (Máy phải để cửa sổ đen mở; đóng cửa sổ là tắt app.)
