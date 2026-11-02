@@ -1,5 +1,4 @@
 vieneu
-gradio
 soundfile
 numpy
 requests

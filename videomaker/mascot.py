@@ -166,11 +166,13 @@ def build(force: bool = False) -> list[Path]:
 
 
 def face(index: int) -> Path | None:
-    """Đường dẫn ảnh biểu cảm đã cắt sẵn; thiếu thì cắt lại rồi trả về."""
-    src = sheet()
-    if src is None:
-        return None
+    """Đường dẫn ảnh biểu cảm đã cắt sẵn; thiếu thì cắt lại từ bảng sprite nếu có.
+
+    Ảnh cắt sẵn được dùng thẳng kể cả khi không còn bảng sprite: người dùng thay tay
+    faces/0.png, faces/1.png (và xoá ảnh bảng) vẫn phải thấy mascot trong video.
+    """
     path = FACES_DIR / f"{index % count()}.png"
-    if not path.exists() or path.stat().st_mtime < src.stat().st_mtime:
+    src = sheet()
+    if src is not None and (not path.exists() or path.stat().st_mtime < src.stat().st_mtime):
         build()
     return path if path.exists() else None

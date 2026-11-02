@@ -148,7 +148,8 @@ các quy tắc tải ảnh minh hoạ ở mục 5–6.
    cột clip của mỗi nhịp luôn là ảnh của mục chứa nó. Không muốn comment nào vào video thì tích ở ô
    **Comment muốn xoá** rồi bấm **🗑 Xoá comment đã chọn**: ảnh của comment đó bị xoá, mục tương ứng
    trong kịch bản chữ bị bỏ (bài gốc luôn giữ, các dòng bạn đã sửa vẫn nguyên).
-2. **Lời đọc = nguyên văn** `post.text`, rồi `comments[].text` theo like giảm dần. Không viết lại, không
+2. **Lời đọc = nguyên văn** `post.text`, rồi `comments[].text` theo đúng thứ tự trên trang (comment
+   chính theo thứ tự lướt, reply đứng ngay sau cha). Không viết lại, không
    thêm câu dẫn, không bỏ câu, không sửa chính tả/viết tắt của tác giả (`ko`, `b hít zô`, `ctrinh`).
    Chỉ được: chia nhịp, thêm tag, chuyển số viết bằng chữ sang chữ số.
    Ngày giờ / tuổi bài ("2 giờ", "26 thg 10", "26/10/2026") **đã hiện ở header card** nên không bao giờ
@@ -156,9 +157,9 @@ các quy tắc tải ảnh minh hoạ ở mục 5–6.
 3. Chia nhịp theo mục 3 (7–14 từ). Dùng `threads_shot.split_beats()`, `mark_emphasis()`,
    `build_editable_script()` thay vì tự chia tay; chúng giữ nguyên từng chữ và ưu tiên cắt ở dấu câu /
    ranh giới ngoặc kép. `threads_shot.parse_sections()` đọc lại bản đã sửa để dựng bảng nhịp.
-   Thứ tự comment luôn tính lại theo like **mỗi lần lấy bài**: Threads dùng danh sách ảo, gỡ card khỏi
-   DOM khi cuộn và xếp lại comment, nên scraper gom dần qua từng lượt cuộn (`crawl()`), không đọc một
-   lần ở cuối trang (đọc kiểu đó mất đúng các comment nhiều like nhất ở đầu trang).
+   Không xếp lại comment theo like: giữ đúng thứ tự Threads hiển thị. Threads dùng danh sách ảo, gỡ
+   card khỏi DOM khi cuộn, nên scraper gom dần qua từng lượt cuộn (`crawl()`, dict giữ thứ tự lần đầu
+   thấy = thứ tự trên trang), không đọc một lần ở cuối trang (đọc kiểu đó mất các comment ở đầu trang).
 4. **Mỗi nhịp dùng đúng ảnh của bài/comment chứa nó** — ghi thẳng tên file vào cột clip:
    `post/01-post-uidasoda.png` cho mọi nhịp của bài gốc, `post/02-cmt-truogg36x.png` cho mọi nhịp của
    comment đó… Đây là ngoại lệ của quy tắc "mỗi ảnh chỉ xuất hiện 1 lần": một ảnh card phải theo suốt

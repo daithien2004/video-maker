@@ -24,6 +24,7 @@ from pathlib import Path
 import numpy as np
 import soundfile as sf
 
+from . import next_card
 from .paths import APP_DIR
 ASSETS = APP_DIR / "assets"
 BG_DIR = ASSETS / "backgrounds"
@@ -45,9 +46,15 @@ W, H = 1080, 1920   # khung dọc; fps lấy theo opt.fps (mặc định 60)
 LEAD = 0.25   # giây im lặng đầu video
 GAP = 0.18    # khoảng nghỉ giữa các dòng
 TAIL = 0.6    # giây im lặng cuối video
+ZOOM_HOLD = 1.0   # giữ card đã phóng to thêm chút sau tiếng zoom cho kịp nhìn
+ZOOM_IN = 0.18    # thời gian phóng + nảy của nhịp zoom
+ZOOM_BACK = 2.2   # độ nảy: phóng vọt quá cỡ zoom rồi trở về đúng cỡ
 
 BACKEND_VIENEU = "vieneu"
 BACKEND_DUMMY = "dummy"
+
+# Encoder CPU cho bản cuối (và cho lần xuất lại khi NVENC không lấy được VRAM).
+CPU_VENC = ["-c:v", "libx264", "-preset", "medium", "-crf", "18"]
 
 
 # --------------------------------------------------------------------------- tiện ích
@@ -95,6 +102,14 @@ def probe_duration(path: Path) -> float:
         return 0.0
 
 
+def swap_encoder(args: list[str], old: list[str], new: list[str]) -> list[str]:
+    """Đổi cụm cờ encoder trong lệnh FFmpeg, giữ nguyên phần còn lại."""
+    for i in range(len(args) - len(old) + 1):
+        if args[i:i + len(old)] == old:
+            return args[:i] + new + args[i + len(old):]
+    return args
+
+
 def run_ffmpeg(args: list[str], cwd: Path, stall: float = 90.0) -> None:
     """Chạy FFmpeg và canh tiến độ: quá `stall` giây không nhích thì kill + báo lỗi.
 
@@ -113,15 +128,18 @@ def run_ffmpeg(args: list[str], cwd: Path, stall: float = 90.0) -> None:
         for _ in p.stdout:
             last[0] = time.time()
 
-    threading.Thread(target=_drain, daemon=True).start()
+    reader = threading.Thread(target=_drain, daemon=True)
+    reader.start()
     killed = False
     while p.poll() is None:
         if time.time() - last[0] > stall:
             p.kill()
             killed = True
             break
-        time.sleep(1)
+        time.sleep(0.1)
     p.wait()
+    reader.join()
+    p.stdout.close()
     log.seek(0)
     err = log.read()
     log.close()
@@ -188,7 +206,6 @@ def normalize_beats(beats: list[Beat]) -> list[Beat]:
     """Chuẩn hoá chữ hiển thị: bỏ gạch ngang dài, bỏ dấu ngắt mắc kẹt cuối cụm."""
     for b in beats:
         b.display = re.sub(r"\s*[—–]\s*", " ", b.display).strip()
-    return beats
     return beats
 
 
@@ -476,6 +493,7 @@ class Options:
     sfx: bool = True               # tiếng pop/whoosh ở mỗi lần sang mục
     fps: int = 60                  # khung hình/giây: 60 mượt hơn 30 khi có chuyển động
     mascot: bool = True            # mascot trồi lên từ đáy khung ở nhịp mở đầu (hook)
+    next_card: bool = True         # Threads: card kế tiếp chờ mờ bên dưới rồi trượt lên thay card cũ
     seed: int | None = None
     threads: bool = False
     threads_radius: int = 0
@@ -832,7 +850,9 @@ def _build_spans(timed: list[dict], carry: bool) -> list[dict]:
                 cur["subs"] = cur["subs"] or has_text
                 continue
             cur = {"clip": clip, "start": t["vis_start"], "end": t["vis_end"],
-                   "subs": has_text, 'zoom': t.get('zoom', False)}
+                   "subs": has_text, 'zoom': t.get('zoom', False),
+                   'sound': bool(t.get('sound')),
+                   'context': (t.get('context') or '').strip()}
             spans.append(cur)
         elif carry and cur is not None:
             cur["end"] = t["vis_end"]
@@ -840,6 +860,23 @@ def _build_spans(timed: list[dict], carry: bool) -> list[dict]:
         else:
             cur = None
     return spans
+
+
+def _pop_starts(spans: list[dict], *, first: bool = True) -> list[float]:
+    """Mốc kêu tiếng chuyển mục: mỗi lần một card mới hiện ra.
+
+    Mục mở màn bằng nhịp `[sound]`/`[zoom]` đã kêu bằng videoplayback trong voice.wav
+    rồi, thêm pop nữa thành hai tiếng chồng nhau. `first=False` bỏ mốc 0 (khi dùng
+    whoosh, card đầu video không cần tiếng chuyển).
+    """
+    out: list[float] = []
+    for kk, sp in enumerate(spans):
+        if sp.get("sound") or (kk == 0 and not first):
+            continue
+        if kk and sp.get("clip") == spans[kk - 1].get("clip"):
+            continue
+        out.append(sp["start"])
+    return out
 
 
 def _probe_size(path: Path) -> tuple[int, int] | None:
@@ -889,6 +926,109 @@ THREADS_TEXT_GAP = 0          # chữ bám sát đáy card (font đã có leadin
 THREADS_CARD_CENTER = 768     # tâm dọc của card khi nhịp không có chữ (40% khung 1920)
 THREADS_BOTTOM_RESERVE = 140  # chừa đáy cho caption/UI khi có chữ
 
+NEXT_CARD_GAP = 92            # khoảng hở cho sợi dây nối giữa hai card
+NEXT_CARD_SCALE = 0.86        # card kế tiếp nhỏ hơn card đang đọc
+NEXT_CARD_DIM = 0.12          # độ tối của card kế tiếp (eq brightness)
+NEXT_CARD_SAT = 0.55          # độ bão hoà màu của card kế tiếp
+NEXT_CARD_DELAY = 0.5         # card kế tiếp hiện sau khi card hiện tại đứng yên
+NEXT_CARD_PREVIEW = 0.4       # thời gian tối thiểu card kế tiếp chờ sẵn (nhịp đọc ngắn)
+
+MASCOT_H = 1100               # chiều cao mascot mở đầu
+MASCOT_BOTTOM = H + 40        # chân mascot nằm ngoài khung
+MASCOT_TOP = MASCOT_BOTTOM - MASCOT_H
+MASCOT_CARD_GAP = 28          # hở giữa card bài post và đỉnh đầu mascot
+
+
+def _mascot_eyes(im) -> float | None:
+    """Tâm ngang khuôn mặt: trung điểm hai mắt, đơn vị px của ảnh gốc.
+
+    Ảnh biểu cảm thay tay thường bị cắt lệch — nhân vật không nằm giữa khung ảnh,
+    lệch cả so với hộp alpha — nên canh theo mắt mới thấy mặt đứng giữa. Mắt là hai
+    đốm sáng to, cùng cỡ, cùng hàng nằm quanh giữa khối người. Không thấy cặp nào
+    thì trả None để canh theo hộp alpha.
+    """
+    from collections import deque
+    from PIL import Image
+    w, h = im.size
+    if w < 16 or h < 16:
+        return None
+    k = max(1, w // 400)   # thu nhỏ giữ nguyên tỉ lệ để dò nhanh
+    a = np.asarray(im.convert("RGBA").resize((max(1, w // k), max(1, h // k)), Image.BOX)).astype(int)
+    al = a[:, :, 3] > 12
+    bright = al & (a[:, :, :3].min(2) > 228)
+    if not bright.any():
+        return None
+    bh, bw = bright.shape
+    seen = np.zeros_like(bright)
+    blobs: list[tuple[int, int, int, int, int]] = []
+    for y0, x0 in zip(*np.where(bright)):
+        if seen[y0, x0]:
+            continue
+        q, seen[y0, x0] = deque([(y0, x0)]), True
+        n = 0
+        bx0 = bx1 = x0
+        by0 = by1 = y0
+        while q:
+            y, x = q.popleft()
+            n += 1
+            bx0, bx1, by0, by1 = min(bx0, x), max(bx1, x), min(by0, y), max(by1, y)
+            for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                ny, nx = y + dy, x + dx
+                if 0 <= ny < bh and 0 <= nx < bw and bright[ny, nx] and not seen[ny, nx]:
+                    seen[ny, nx] = True
+                    q.append((ny, nx))
+        blobs.append((n, bx0, bx1, by0, by1))
+    # Chỉ giữ đốm cỡ mắt: bỏ viền trắng và cả khối mặt (to gấp nhiều lần).
+    cand = [b for b in blobs
+            if 0.0015 * bh * bw < b[0] < 0.02 * bh * bw
+            and b[2] - b[1] + 1 <= 0.12 * bw
+            and b[4] - b[3] + 1 > 4
+            and 0.4 < (b[2] - b[1] + 1) / (b[4] - b[3] + 1) < 2.5]
+    ys, xs = np.where(al)
+    a_cx, a_half = (xs.min() + xs.max() + 1) / 2, (xs.max() - xs.min() + 1) / 2
+    best = None
+    for i in range(len(cand)):
+        for j in range(i + 1, len(cand)):
+            a1, x10, x11, y10, y11 = cand[i]
+            a2, x20, x21, y20, y21 = cand[j]
+            c1, c2 = (x10 + x11) / 2, (x20 + x21) / 2
+            wd = ((x11 - x10 + 1) + (x21 - x20 + 1)) / 2
+            mid = (c1 + c2) / 2
+            if abs((y10 + y11) - (y20 + y21)) > 0.12 * bh:
+                continue
+            if min(a1, a2) < 0.6 * max(a1, a2):
+                continue
+            if not (1.1 * wd < abs(c1 - c2) < 3.0 * wd):
+                continue
+            if abs(mid - a_cx) > 0.2 * a_half:
+                continue
+            if best is None or a1 + a2 > best[0]:
+                best = (a1 + a2, mid * k)
+    return best[1] if best else None
+
+
+def _mascot_x(path: Path, height: int) -> str:
+    """Vị trí ngang của mascot: đặt khuôn mặt vào giữa khung.
+
+    Canh x=(W-w)/2 theo khung ảnh thì cả người lệch khi ảnh biểu cảm bị cắt lệch;
+    ở đây bù đúng phần lệch giữa mặt (hoặc hộp alpha khi không thấy mắt) và tâm
+    ảnh, quy về px sau khi scale. Tính riêng từng mặt để đổi biểu cảm không nhảy ngang.
+    """
+    dx = 0.0
+    try:
+        from PIL import Image
+        with Image.open(path) as im:
+            w, h = im.size
+            ys, xs = np.where(np.asarray(im.convert("RGBA"))[:, :, 3] > 12)
+            if len(xs):
+                dx = ((xs.min() + xs.max() + 1) / 2 - w / 2) * (height / h)
+            center = _mascot_eyes(im)
+            if center is not None:
+                dx = (center - w / 2) * (height / h)
+    except Exception:  # noqa: BLE001
+        dx = 0.0
+    return f"(W-w)/2{-dx if dx else 0.0:+.1f}"
+
 
 def _threads_cap(has_text: bool, opt: "Options") -> int:
     """Chiều cao tối đa của khung Threads: chừa chỗ cho 2 dòng chữ, hoặc chừa 2 mép."""
@@ -918,6 +1058,22 @@ def _threads_box(spans: list[dict], opt: "Options") -> int:
     return max(200, min(needed or 200, cap))
 
 
+def _zoom_scale(factor: float) -> str:
+    """Hệ số phóng nhịp ảnh: cỡ thường -> cỡ zoom, vọt quá rồi trở lại (nảy).
+
+    Nhịp chỉ có ảnh không có hiệu ứng hiện-ra riêng: card đứng sẵn ở cỡ thường rồi
+    phóng ngay; ease-out-back làm cú phóng vọt quá cỡ trong ZOOM_IN giây rồi thu về
+    đúng cỡ zoom, nên mắt thấy đúng một cú zoom có nảy. Card dựng sẵn ở cỡ zoom nên
+    nhân 1/factor cho khung đầu về cỡ thường.
+    """
+    if factor <= 1.0:
+        return "1"
+    q = f"(min(t/{ZOOM_IN:g},1)-1)"     # -1 ở đầu mục, 0 khi phóng + nảy xong
+    ease = f"(1+{ZOOM_BACK + 1:.4f}*pow({q},3)+{ZOOM_BACK:.4f}*pow({q},2))"
+    low = 1 / factor
+    return f"({low:.4f}+{1 - low:.4f}*{ease})"
+
+
 def _threads_opt(opt: "Options", spans: list[dict]) -> "Options":
     """Bản Options đã áp bố cục Threads: khung cao theo card, chữ sát đáy khung.
 
@@ -935,6 +1091,75 @@ def _overlay_y_threads(opt: "Options", has_subs: bool) -> str:
     if has_subs:
         return _overlay_y(opt)
     return f"{THREADS_CARD_CENTER}-h/2"
+
+
+def _threads_card_geometry(sp: dict, opt: "Options") -> dict:
+    """Kích thước và mép trên thật của card sau khi scale — để đặt card kế tiếp theo số.
+
+    FFmpeg thu card vừa khung (`force_original_aspect_ratio=decrease`) nên card cao
+    hẹp ra hẹp hơn `meme_w`; vị trí card kế tiếp phải tính từ chiều cao thật đó.
+    """
+    p = Path(sp["clip"])
+    img = p.suffix.lower() in IMAGE_EXT
+    factor = opt.threads_zoom / 100 if sp.get("zoom") else 1.0
+    width = opt.meme_w * factor
+    box = opt.meme_h
+    if opt.threads and not sp.get("subs"):
+        box = _threads_box([sp], opt)
+    if opt.threads:
+        width *= _card_pad(str(p))
+    size = _probe_size(p) if img else None
+    if size and size[0] and size[1]:
+        fit_w = min(width, box * size[0] / size[1])
+        fit_h = fit_w * size[1] / size[0]
+    else:
+        fit_w, fit_h = width, box
+    w, h = round(fit_w), round(fit_h)
+    top = opt.meme_y + opt.meme_h - h if sp.get("subs") else THREADS_CARD_CENTER - h / 2
+    return {"img": img, "w": w, "h": h, "top": round(top)}
+
+
+def _next_card_plan(spans: list[dict], opt: "Options") -> list[dict]:
+    """Kế hoạch chuyển cảnh, chốt theo loại card.
+
+    - Comment chính: nảy vào tại chỗ (pop), không có card chờ — người xem thấy một
+      comment mới của thread, không phải dòng tiếp theo của comment trước.
+    - Reply (có khung ngữ cảnh cha): trượt lên từ dưới — hiện mờ ngay dưới comment
+      đang đọc, nối bằng sợi dây, rồi hai card trượt lên cùng quãng như một lần cuộn
+      feed. Nhịp đọc ngắn ("=))", "tht sự") chỉ dời mốc hiện card chờ sớm hơn, không
+      bỏ card chờ (trước đây bị bỏ nên cùng một reply lúc thì có dây nối, lúc thì
+      trượt từ đáy khung).
+    """
+    geo = [_threads_card_geometry(sp, opt) for sp in spans]
+    plan = [{"geo": g, "in": None, "out": None, "pv": None} for g in geo]
+    for k in range(1, len(spans)):
+        sp, g = spans[k], geo[k]
+        reply = bool(str(sp.get("context") or "").strip())
+        if not g["img"] or sp.get("zoom") or not reply:
+            continue
+        # Card chờ luôn nép dưới card đang đọc (mục k-1). Nhịp zoom cũng vậy: reply
+        # sau zoom chỉ hiện card chờ khi card cha đã vào khung — lấy mục k-2 thì reply
+        # con hiện trước cả comment cha.
+        pv = None
+        if geo[k - 1]["img"]:
+            holder = k - 1
+            start = spans[holder]["start"] + NEXT_CARD_DELAY
+            # Nhịp quá ngắn: hiện card chờ sớm hơn, luôn giữ đủ NEXT_CARD_PREVIEW giây.
+            start = max(spans[holder]["start"], min(start, sp["start"] - NEXT_CARD_PREVIEW))
+            top = geo[holder]["top"] + geo[holder]["h"] + NEXT_CARD_GAP
+            # Chỉ bỏ card chờ khi chỗ chờ nằm ngoài khung (card zoom cao tràn khung).
+            if top <= H - 120:
+                pv = {"start": start, "top": top}
+        y0 = pv["top"] if pv else H + 40
+        dist = y0 - g["top"]
+        plan[k]["in"] = {"y0": y0, "t": min(0.55, max(0.32, dist / 2600))}
+        plan[k]["pv"] = pv
+    for k in range(len(spans) - 1):
+        nxt = plan[k + 1]
+        if nxt["in"] and geo[k]["img"]:
+            delta = nxt["in"]["y0"] - geo[k + 1]["top"] if nxt["pv"] else 0
+            plan[k]["out"] = {"delta": delta, "t": nxt["in"]["t"]}
+    return plan
 
 
 def _with_context(timed: list[dict], opt: Options, job: Path, max_h: int | None = None) -> None:
@@ -982,6 +1207,72 @@ def beat_audio(spoken: str, opt: Options) -> np.ndarray:
     if not len(audio):
         raise ValueError('File âm thanh của nhịp đang trống.')
     return audio * 0.6 if sound else audio
+
+
+def voice_lines(rows: list[list], opt: Options, index: int | None = None,
+                force: bool = False, cb=None) -> list[dict]:
+    """Sinh giọng đọc cho từng nhịp (chỉ âm thanh), dùng chung cache với lúc dựng video.
+
+    `index` = chỉ làm lại một nhịp (0-based); `force` = xoá cache của nhịp đó rồi sinh lại.
+    Nhịp `[sound]`/`[zoom]` không có giọng đọc nên trả về `kind: 'sfx'`, không tạo file.
+    """
+    cb = cb or (lambda f, m: None)
+    spoken_lines: list[tuple[int, str]] = []
+    for i, r in enumerate(rows):
+        if r is None or len(r) < 5:
+            continue
+        spoken = str(r[1] or "").replace("*", "").strip()
+        if not spoken and opt.threads and r[4]:
+            spoken = "[sound]"
+        if spoken:
+            spoken_lines.append((i, spoken))
+    if not spoken_lines:
+        raise ValueError("Kịch bản đang trống. Hãy nhập kịch bản và bấm 'Phân tích kịch bản' trước.")
+    wanted = list(range(len(spoken_lines))) if index is None else [int(index)]
+    items: list[dict] = []
+    for completed, n in enumerate(wanted, 1):
+        if not 0 <= n < len(spoken_lines):
+            raise ValueError(f"Nhịp {n + 1} không có trong kịch bản.")
+        row_index, spoken = spoken_lines[n]
+        cb(completed / max(1, len(wanted)), f"Sinh giọng nhịp {n + 1}/{len(spoken_lines)}…")
+        sound = opt.threads and spoken in ("[sound]", "[zoom]")
+        if sound:
+            items.append({"beat": n + 1, "row": row_index, "text": spoken,
+                          "kind": "sfx", "seconds": 0.0, "cached": True, "path": ""})
+            continue
+        key = hashlib.sha1(f"{opt.backend}|{opt.voice}|{opt.speed:.2f}|{spoken}".encode("utf-8")).hexdigest()[:20]
+        cached = (CACHE_DIR / f"{key}.wav").is_file()
+        if force:
+            (CACHE_DIR / f"{key}.wav").unlink(missing_ok=True)
+            (CACHE_DIR / f"{key}_raw.wav").unlink(missing_ok=True)
+            (CACHE_DIR / f"{key}_48000.wav").unlink(missing_ok=True)
+            cached = False
+        path = synth(spoken, opt.backend, opt.voice, opt.speed)
+        items.append({"beat": n + 1, "row": row_index, "text": spoken, "kind": "voice",
+                      "seconds": round(float(sf.info(str(path)).duration), 2),
+                      "cached": cached, "path": str(path)})
+    return items
+
+
+def _background_filter(fps: int, total: float, motion: bool) -> str:
+    if motion and total > 2:
+        # Keep the 2x sampling grid for smooth subpixel movement, but sample directly
+        # into the final frame instead of resizing a changing 4K-sized intermediate.
+        width, height = W * 2, H * 2
+        zoom = f"(1+0.10*min(in_time,{total:.2f})/{total:.2f})"
+        return (f"[0:v]fps={fps}:start_time=0,scale={width}:{height}:force_original_aspect_ratio=increase,"
+                f"crop={width}:{height},zoompan=z='{zoom}':"
+                f"x='iw/2-iw/zoom/2':y='ih/2-ih/zoom/2':d=1:s={W}x{H}:fps={fps},"
+                "setsar=1,format=yuv420p[v0]")
+    return (f"[0:v]fps={fps},scale={W}:{H}:force_original_aspect_ratio=increase,"
+            f"crop={W}:{H},setsar=1,format=yuv420p[v0]")
+
+
+def _pass_bounds(n_spans: int, fps: int) -> list[int]:
+    """Cụm mục card mỗi pass. 60fps giữ cụm nhỏ vì mỗi overlay chiếm buffer 1080x1920."""
+    per_pass = 10 if fps > 30 else 22
+    chunk_at = 14 if fps > 30 else 45
+    return list(range(0, n_spans, per_pass)) if n_spans > chunk_at else [0]
 
 
 def render(rows: list[list], opt: Options, preview: bool = False, cb=None) -> Path:
@@ -1035,8 +1326,12 @@ def render(rows: list[list], opt: Options, preview: bool = False, cb=None) -> Pa
             "clip": str(clip_path) if clip_path else None,
             "context": b.context,
             'zoom': zoom,
+            # Nhịp mở màn bằng tiếng videoplayback: chính nó là tiếng chuyển mục,
+            # không cần thêm pop ở section_starts.
+            'sound': opt.threads and b.spoken in ('[sound]', '[zoom]'),
         })
-        t += dur + opt.gap + _pause_after(b.spoken)
+        # Nhịp zoom đọc/nghe hết tiếng rồi giữ thêm một nhịp để card to kịp hiện.
+        t += dur + (ZOOM_HOLD if zoom else 0.0) + opt.gap + _pause_after(b.spoken)
     total = t - opt.gap + TAIL
     for i, x in enumerate(timed):
         nxt = timed[i + 1]["start"] if i + 1 < len(timed) else total
@@ -1075,14 +1370,13 @@ def render(rows: list[list], opt: Options, preview: bool = False, cb=None) -> Pa
     bg = bg or rng.choice(bgs)
     bg_len = probe_duration(bg)
 
-    args: list[str] = []
+    bg_args: list[str] = []
     if bg_len > total + 1.0:
         start = rng.uniform(0, bg_len - total - 0.5)
-        args += ["-ss", f"{start:.2f}", "-t", f"{total:.2f}", "-i", str(bg)]
+        bg_args += ["-ss", f"{start:.2f}", "-t", f"{total:.2f}", "-i", str(bg)]
     else:
-        args += ["-stream_loop", "-1", "-t", f"{total:.2f}", "-i", str(bg)]
-    args += ["-i", str(job / "voice.wav")]
-    next_idx = 2
+        bg_args += ["-stream_loop", "-1", "-t", f"{total:.2f}", "-i", str(bg)]
+    voice_args = ["-i", str(job / "voice.wav")]
 
     ctx_max = None
     if opt.threads:
@@ -1110,22 +1404,14 @@ def render(rows: list[list], opt: Options, preview: bool = False, cb=None) -> Pa
     if opt.threads and spans:
         opt = _threads_opt(opt, spans)
     (job / "subs.ass").write_text(build_ass(timed, opt), encoding="utf-8")
-    fps = int(opt.fps)
-    if opt.bg_motion and total > 2:
-        # Nền phủ đủ khung ở 2x, phóng 0 -> 10% rồi cắt lại 1080x1920. Vì bước phóng
-        # được làm ở 2x rồi hạ mẫu về 1080 nên mỗi bước chỉ ~0.5px — hết kiểu giật
-        # từng khung 1px như khi phóng trực tiếp trên 1080.
-        cover_w, cover_h = W * 2, H * 2
-        zoom = f"(1+0.10*min(t,{total:.2f})/{total:.2f})"
-        fg = [f"[0:v]fps={fps},scale={cover_w}:{cover_h}:force_original_aspect_ratio=increase,"
-              f"crop={cover_w}:{cover_h},"
-              f"scale=w='trunc({cover_w}*{zoom})':h='trunc({cover_h}*{zoom})':eval=frame,"
-              f"crop={cover_w}:{cover_h}:(in_w-{cover_w})/2:(in_h-{cover_h})/2,"
-              f"scale={W}:{H},setsar=1,format=yuv420p[v0]"]
-    else:
-        fg = [f"[0:v]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},"
-              f"setsar=1,fps={fps},format=yuv420p[v0]"]
-    cur_label = "v0"
+    fps = min(30, int(opt.fps)) if preview else int(opt.fps)
+    # Graph dựng hình được chia thành mảnh theo span: mỗi mảnh tự chứa input và
+    # chuỗi filter của một mục, với incoming label xác định trước (v{k}, riêng mục
+    # đầu là v0/mb). Cuối hàm, các mảnh được ghép theo cụm ~22 mục một pass để RAM
+    # không tăng theo số comment; video ngắn vẫn ghép đúng một pass như trước.
+    frags: list[dict] = [dict(inputs=bg_args, fg=[_background_filter(fps, total, opt.bg_motion)],
+                              in_label="v0", out_label="v0", n_inputs=1)]
+    cur_in = "v0"
     # Mascot mở đầu: trồi lên từ đáy khung, dừng hẳn rồi mới đổi biểu cảm (bình
     # thường -> thắc mắc), hết hook thì tụt xuống. Hai lớp overlay chồng lên nhau,
     # mỗi lớp chỉ bật trong đúng khoảng thời gian của nó. Overlay đặt trước card nên
@@ -1140,11 +1426,12 @@ def render(rows: list[list], opt: Options, preview: bool = False, cb=None) -> Pa
         except Exception:  # noqa: BLE001
             mp_a = mp_b = None
         if mp_a and mp_b and span > 2.0:
-            args += ["-loop", "1", "-framerate", str(fps), "-t", f"{total:.2f}", "-i", str(mp_a)]
-            args += ["-loop", "1", "-framerate", str(fps), "-t", f"{total:.2f}", "-i", str(mp_b)]
-            mh, appear, hold, hide = 900, 0.6, 0.35, 0.35
-            bottom = H + 40          # chân mascot nằm ngoài khung -> chỉ thấy phần thân
-            top = bottom - mh
+            m_in: list[str] = []
+            m_in += ["-loop", "1", "-framerate", "1", "-t", f"{total:.2f}", "-i", str(mp_a)]
+            m_in += ["-loop", "1", "-framerate", "1", "-t", f"{total:.2f}", "-i", str(mp_b)]
+            mh, appear, hold, hide = MASCOT_H, 0.6, 0.35, 0.35
+            bottom = MASCOT_BOTTOM   # chân mascot nằm ngoài khung -> chỉ thấy phần thân
+            top = MASCOT_TOP
             t0 = sp0["start"]
             swap_at = t0 + appear + hold
             out_at = max(swap_at + 0.2, sp0["end"] - hide)
@@ -1156,24 +1443,30 @@ def render(rows: list[list], opt: Options, preview: bool = False, cb=None) -> Pa
             fall = f"{top}+({bottom - top})*{v}*{v}"
             y = (f"if(lt(t,{t0 + appear:.3f}),{rise},"
                  f"if(gt(t,{out_at:.3f}),{fall},{top}))")
-            for tag, start, end, label_out in (
-                ("a", t0, swap_at, "ma"),
-                ("b", swap_at, sp0["end"], "mb"),
-            ):
-                fg.append(f"[{next_idx}:v]scale=-2:{mh},setsar=1,fps={fps},format=rgba[{tag}]")
-                fg.append(f"[{cur_label}][{tag}]overlay=x=(W-w)/2:y='{y}':"
-                          f"enable='between(t,{start:.3f},{end:.3f})'[{label_out}]")
-                next_idx += 1
-                cur_label = label_out
+            m_fg = [f"[0:v]scale=-2:{mh},setsar=1,fps={fps},format=rgba[a]",
+                    f"[{cur_in}][a]overlay=x={_mascot_x(mp_a, mh)}:y='{y}':"
+                    f"enable='between(t,{t0:.3f},{swap_at:.3f})'[ma]",
+                    f"[1:v]scale=-2:{mh},setsar=1,fps={fps},format=rgba[b]",
+                    f"[ma][b]overlay=x={_mascot_x(mp_b, mh)}:y='{y}':"
+                    f"enable='between(t,{swap_at:.3f},{sp0['end']:.3f})'[mb]"]
+            frags.append(dict(inputs=m_in, fg=m_fg, in_label=cur_in, out_label="mb", n_inputs=2))
+            cur_in = "mb"
+    # Reply: mục sau được báo trước bằng chính card của nó — hiện mờ, nhỏ bên dưới, nối
+    # với card đang đọc bằng một sợi dây; sang mục thì nó trượt lên thay card cũ, card
+    # cũ trượt theo cùng quãng như một lần cuộn feed. Comment chính thì nảy vào tại chỗ
+    # (pop) và không có card chờ. Nhịp zoom giữ nguyên; card kế tiếp chỉ trượt lên sau
+    # khi zoom xong.
+    plan = _next_card_plan(spans, opt) if opt.next_card and opt.threads and len(spans) > 2 else None
     for k, sp in enumerate(spans):
+        s_in: list[str] = []
+        s_fg: list[str] = []
+        entry_in = cur_in
         p = Path(sp["clip"])
+        img = p.suffix.lower() in IMAGE_EXT
         dur = sp["end"] - sp["start"]
-        if p.suffix.lower() in IMAGE_EXT:
-            args += ["-loop", "1", "-framerate", str(fps), "-t", f"{dur:.2f}", "-i", str(p)]
-        else:
-            args += ["-stream_loop", "-1", "-t", f"{dur:.2f}", "-i", str(p)]
-        i = next_idx
-        next_idx += 1
+        step = plan[k] if plan else None
+        out = step["out"] if step and img else None
+        tail_t = out["t"] if out else 0.0
         zoom = opt.threads_zoom / 100 if sp.get('zoom') else 1.0
         box_h = opt.meme_h
         if opt.threads and not sp.get("subs"):
@@ -1182,14 +1475,82 @@ def render(rows: list[list], opt: Options, preview: bool = False, cb=None) -> Pa
         if opt.threads:
             # Bóng đổ độn thêm viền trong suốt: bù lại để bề ngang card thật đúng meme_w.
             width = round(width * _card_pad(str(p)))
-        chain = f"[{i}:v]scale={width}:{round(box_h)}:force_original_aspect_ratio=decrease"
+        fit = f"scale={width}:{round(box_h)}:force_original_aspect_ratio=decrease"
+
+        pv = step["pv"] if step else None
+        if pv:
+            pv_start = pv["start"]
+            pv_dur = sp["start"] - pv_start
+            y_link = str(pv["top"] - NEXT_CARD_GAP)
+            y_card = str(pv["top"])
+            s_in += ["-loop", "1", "-framerate", "1", "-t", f"{pv_dur:.2f}", "-i", str(p)]
+            pi = 0
+            try:
+                cpath = next_card.connector(W, NEXT_CARD_GAP, job / f"thread_{k}.png")
+            except Exception:  # noqa: BLE001
+                cpath = None          # thiếu Pillow -> vẫn có card chờ, chỉ thiếu dây nối
+            if cpath is not None:
+                s_in += ["-loop", "1", "-framerate", "1", "-t", f"{pv_dur:.2f}", "-i", str(cpath)]
+                ci = 1
+                # Dây nối tắt trước khi card trượt để không chạy ngược hướng với card.
+                s_fg.append(f"[{ci}:v]format=rgba,fps={fps},"
+                            f"fade=t=in:st=0:d=0.18:alpha=1,"
+                            f"fade=t=out:st={max(0.0, pv_dur - 0.2):.2f}:d=0.2:alpha=1,"
+                            f"setpts=PTS-STARTPTS+{pv_start:.3f}/TB[c{k}]")
+                s_fg.append(f"[{cur_in}][c{k}]overlay=x=0:y='{y_link}':"
+                            f"enable='between(t,{pv_start:.3f},{sp['start']:.3f})'[d{k}]")
+                cur_in = f"d{k}"
+            # Card chờ không tắt dần ở cuối: đến đúng mốc sang mục thì card chính tiếp
+            # quản đúng vị trí/độ sáng này rồi trượt lên, nhờ vậy không bị nháy.
+            s_fg.append(f"[{pi}:v]{fit},"
+                        f"scale=w='trunc(in_w*{NEXT_CARD_SCALE})':h='trunc(in_h*{NEXT_CARD_SCALE})',"
+                        f"setsar=1,fps={fps},"
+                        f"eq=brightness={-NEXT_CARD_DIM}:saturation={NEXT_CARD_SAT},"
+                        f"format=yuva420p,"
+                        f"fade=t=in:st=0:d={min(0.22, pv_dur * 0.4):.2f}:alpha=1,"
+                        f"setpts=PTS-STARTPTS+{pv_start:.3f}/TB[p{k}]")
+            s_fg.append(f"[{cur_in}][p{k}]overlay=x='(W-w)/2':y='{y_card}':"
+                        f"enable='between(t,{pv_start:.3f},{sp['start']:.3f})'[q{k}]")
+            cur_in = f"q{k}"
+
+        main_dur = dur + tail_t
+        i = s_in.count("-i")
+        if img:
+            s_in += ["-loop", "1", "-framerate", "1", "-t", f"{main_dur:.2f}", "-i", str(p)]
+        else:
+            s_in += ["-stream_loop", "-1", "-t", f"{dur:.2f}", "-i", str(p)]
+        chain = f"[{i}:v]{fit},setsar=1,fps={fps}"
+        # Fade tắt dần phải nằm TRƯỚC bước scale chạy theo thời gian: fade đòi kích
+        # thước khung không đổi, còn card trượt/nảy thì đổi cỡ từng khung.
+        if out:
+            # Card cũ trượt lên trong lúc card kế tiếp lên thay: tắt dần ở cuối để mép
+            # còn sót lại không biến mất đột ngột.
+            chain += f",fade=t=out:st={max(0.0, main_dur - 0.3):.3f}:d=0.3:alpha=1"
         new_section = k == 0 or sp.get("clip") != spans[k - 1].get("clip")
-        if opt.pop_in and opt.threads and new_section and dur > 0.6:
+        entering = bool(step and step["in"])
+        if entering:
+            # Trượt lên từ vị trí chờ (hoặc từ đáy khung khi không còn chỗ chờ) và sáng
+            # dần tới màu thật. Chạy theo thời gian riêng của card (mốc 0 = lúc vào mục).
+            s0 = NEXT_CARD_SCALE if pv else 0.94
+            tint = step["in"]["t"]
+            ease = f"(1-pow(1-min(max(t/{tint:.3f},0),1),3))"
+            # eq cũng đòi kích thước khung cố định nên đặt trước bước scale theo thời gian.
+            chain += (f",eq=brightness='{NEXT_CARD_DIM:.3f}*{ease}-{NEXT_CARD_DIM:.3f}':"
+                      f"saturation='{NEXT_CARD_SAT:.3f}+{1 - NEXT_CARD_SAT:.3f}*{ease}':eval=frame")
+            chain += (f",scale=w='trunc(in_w*({s0:.3f}+{1 - s0:.3f}*{ease}))':"
+                      f"h='trunc(in_h*({s0:.3f}+{1 - s0:.3f}*{ease}))':eval=frame")
+        elif sp.get("zoom") and new_section and dur > 0.3:
+            # Nhịp chỉ có ảnh: không có bước hiện-ra riêng — card đứng sẵn ở cỡ thường
+            # rồi phóng ngay, cú phóng tự vọt quá cỡ và trở lại nên có độ nảy.
+            grow = _zoom_scale(zoom)
+            chain += (f",scale=w='trunc(in_w*{grow})':"
+                      f"h='trunc(in_h*{grow})':eval=frame")
+        elif opt.pop_in and opt.threads and new_section and dur > 0.6:
             # Card nảy vào: hơi nhỏ -> phóng quá cỡ -> về đúng cỡ. Chạy theo thời gian
             # riêng của card (mốc 0 ở đầu mục) nên khớp đúng lúc card xuất hiện.
-            grow = ("(if(lt(t,0.18),0.65+0.40*t/0.18,"
-                    "max(1.05-0.05*(t-0.18)/0.16,1)))")
-            chain += f",scale=w='trunc(in_w*{grow})':h='trunc(in_h*{grow})':eval=frame"
+            pop = ("(if(lt(t,0.18),0.65+0.40*t/0.18,"
+                   "max(1.05-0.05*(t-0.18)/0.16,1)))")
+            chain += f",scale=w='trunc(in_w*{pop})':h='trunc(in_h*{pop})':eval=frame"
         elif opt.card_motion and p.suffix.lower() in IMAGE_EXT and dur > 0.4:
             # Card nảy nhẹ rồi về đúng cỡ: nảy nhanh nên mắt thấy liền mạch. Trôi rất
             # chậm kiểu trước (vài px/giây) bị giật từng khung do phải làm tròn kích thước.
@@ -1204,70 +1565,51 @@ def render(rows: list[list], opt: Options, preview: bool = False, cb=None) -> Pa
                 grow = (f"(if(lt(t,{up:.3f}),0.96+0.07*t/{up:.3f},"
                         f"max(1.03-0.03*(t-{up:.3f})/{down:.3f},1)))")
             chain += f",scale=w='trunc(in_w*{grow})':h='trunc(in_h*{grow})':eval=frame"
-        chain += (f",setsar=1,fps={fps},format=yuva420p,"
-                  f"setpts=PTS-STARTPTS+{sp['start']:.3f}/TB[m{k}]")
-        fg.append(chain)
+        chain += f",format=yuva420p,setpts=PTS-STARTPTS+{sp['start']:.3f}/TB[m{k}]"
+        s_fg.append(chain)
         # Threads có chữ: card dính đáy khung chung; không chữ: card canh giữa dọc.
         # Video thường giữ cách cũ: ảnh canh hơi lệch LÊN giữa màn hình khi không có chữ.
-        if opt.threads:
+        # Bài post mở đầu: đẩy card lên trên đỉnh mascot, không để card đè lên đầu mascot.
+        hook_card = opt.mascot and k == 0 and dur > 2.0 and not sp.get("subs")
+        if step and img and (entering or out):
+            top = step["geo"]["top"]
+            if hook_card:
+                top = min(top, MASCOT_TOP - MASCOT_CARD_GAP - step["geo"]["h"])
+            y = str(top)
+            if out and out["delta"]:
+                te, ot = sp["end"], out["t"]
+                eo = f"(1-pow(1-min(max((t-{te:.3f})/{ot:.3f},0),1),3))"
+                y = f"if(lt(t,{te:.3f}),{y},{top}-{out['delta']}*{eo})"
+            if entering:
+                y0, t0, it = step["in"]["y0"], sp["start"], step["in"]["t"]
+                ei = f"(1-pow(1-min(max((t-{t0:.3f})/{it:.3f},0),1),3))"
+                y = (f"if(lt(t,{t0:.3f}),{y0},"
+                     f"if(lt(t,{t0 + it:.3f}),{y0}+({top}-{y0})*{ei},{y}))")
+        elif opt.threads:
             y = _overlay_y_threads(opt, bool(sp.get("subs")))
+            if hook_card:
+                y = f"min({y},{MASCOT_TOP - MASCOT_CARD_GAP}-h)"
         else:
             y = "(H-h)*0.40" if not sp.get("subs", True) else _overlay_y(opt)
         xs = "(W-w)/2"
-        fg.append(
-            f"[{cur_label}][m{k}]overlay=x='{xs}':y={y}:"
-            f"enable='between(t,{sp['start']:.3f},{sp['end']:.3f})'[v{k + 1}]"
+        s_fg.append(
+            f"[{cur_in}][m{k}]overlay=x='{xs}':y='{y}':"
+            f"enable='between(t,{sp['start']:.3f},{sp['end'] + tail_t:.3f})'[v{k + 1}]"
         )
-        cur_label = f"v{k + 1}"
+        frags.append(dict(inputs=s_in, fg=s_fg, in_label=entry_in,
+                          out_label=f"v{k + 1}", n_inputs=s_in.count("-i")))
+        cur_in = f"v{k + 1}"
 
     tail = "ass=subs.ass:fontsdir=fonts"
     if preview:
         tail += ",scale=540:960"
-    fg.append(f"[{cur_label}]{tail}[vout]")
 
-    # 5c) âm thanh: giọng đọc + tiếng chuyển mục (pop / whoosh) + nhạc nền (nếu bật)
-    fg.append("[1:a]anull[a0]")
-    audio_mix = ["[a0]"]
-    pop = opt.pop_in and opt.threads
-    # Card nảy vào ngay từ đầu video (bài post) nên pop cũng kêu từ mục đầu tiên.
-    section_starts = [sp["start"] for k, sp in enumerate(spans)
-                      if (k > 0 or pop) and sp.get("clip") != (spans[k - 1].get("clip") if k else None)]
-    sfx_path = next((m for m in list_music()
-                     if m.name.lower().startswith("pop" if pop else "whoosh")), None)
-    if opt.sfx and section_starts and sfx_path is not None:
-        args += ["-i", str(sfx_path)]
-        wi = next_idx
-        next_idx += 1
-        n = len(section_starts)
-        labels = "".join(f"[w{j}]" for j in range(n))
-        # Pop.mp3 có sẵn ~0.14s im lặng đầu file; cắt đi để tiếng nổ khớp lúc card
-        # phóng tới cỡ lớn nhất chứ không trễ nửa nhịp.
-        trim = ("atrim=start=0.14:end=0.5,afade=t=out:st=0.22:d=0.14,volume=0.50" if pop
-                else "atrim=0:0.8,volume=0.35")
-        fg.append(f"[{wi}:a]{trim},asetpts=N/SR/TB,asplit={n}{labels}")
-        for j, st in enumerate(section_starts):
-            ms = int(round(st * 1000))
-            fg.append(f"[w{j}]adelay={ms}|{ms}[s{j}]")
-            audio_mix.append(f"[s{j}]")
-    music = list_music() if opt.use_music else []
-    if music:
-        mpath = rng.choice(music)
-        args += ["-stream_loop", "-1", "-i", str(mpath)]
-        mi = next_idx
-        next_idx += 1
-        fg.append(f"[{mi}:a]volume={opt.music_volume:.3f}[mu]")
-        audio_mix.append("[mu]")
-    fg.append("".join(audio_mix) + f"amix=inputs={len(audio_mix)}:duration=first:"
-                                   f"dropout_transition=0:normalize=0[aout]")
-    amap = "[aout]"
-
-    # 6) mã hóa
-    if preview:
-        venc = ["-c:v", "libx264", "-preset", "ultrafast", "-crf", "30"]
-    elif opt.nvenc:
-        venc = ["-c:v", "h264_nvenc", "-preset", "p5", "-rc", "vbr", "-cq", "19", "-b:v", "0"]
-    else:
-        venc = ["-c:v", "libx264", "-preset", "medium", "-crf", "18"]
+    # 6) dựng theo cụm: video nhiều mục (kịch bản Threads dài) sinh graph hàng trăm
+    # node overlay nối tiếp — gộp một lần vừa vượt giới hạn dòng lệnh của Windows,
+    # vừa đòi RAM theo số node. Chia span thành cụm ~22 mục: pass đầu nướng nền và
+    # cụm đầu, các pass sau overlay tiếp lên file trung gian (crf 12, hao hụt không
+    # thấy được), pass cuối trộn âm thanh rồi mã hóa bằng encoder chính. Video ngắn
+    # hơn ngưỡng vẫn đi đúng một pass như cũ.
     stamp = f"{datetime.now():%Y%m%d_%H%M%S}"
     if preview:
         out_name = f"preview_{stamp}.mp4"
@@ -1276,15 +1618,142 @@ def render(rows: list[list], opt: Options, preview: bool = False, cb=None) -> Pa
         topic = norm_tag(opt.content)[:40] or "video"
         out_name = f"video_{topic}_{stamp}.mp4"
     out_path = (WORK_DIR if preview else OUT_DIR) / out_name
-    args += [
-        "-filter_complex", ";".join(fg),
-        "-map", "[vout]", "-map", amap,
-        *venc, "-pix_fmt", "yuv420p", "-r", str(fps),
-        "-c:a", "aac", "-q:a", "4", "-movflags", "+faststart",
-        "-t", f"{total:.2f}", str(out_path),
-    ]
-    cb(0.6, "Đang xuất video…" if not preview else "Đang dựng bản xem thử…")
-    run_ffmpeg(args, job)
+
+    n_spans = len(spans)
+    # Mỗi mục card giữ buffer frame 1080x1920 trong graph, ~100MB lúc 60fps; dồn
+    # hơn chục mục vào một pass là FFmpeg xin vài GB commit và báo "Cannot allocate
+    # memory" trên máy đang chạy nhiều app. 60fps vì thế chia cụm nhỏ hơn 30fps
+    # (tổng khối lượng overlay không đổi, chỉ thêm chi phí nền mỗi pass).
+    bounds = _pass_bounds(n_spans, fps)
+    pre = frags[:len(frags) - n_spans]      # nền + mascot
+    body = frags[len(frags) - n_spans:]     # từng mục card
+    prev_out: Path | None = None
+    tmp_outs: list[Path] = []
+    for pi_, b0 in enumerate(bounds):
+        b1 = bounds[pi_ + 1] if pi_ + 1 < len(bounds) else n_spans
+        is_first, is_last = pi_ == 0, pi_ == len(bounds) - 1
+        p_args: list[str] = []
+        fg_p: list[str] = []
+        if is_first:
+            # pass 1: nền là input đầu tiên (index 0), giọng đọc ngay sau (index 1)
+            head, *rest = pre
+            p_args += head["inputs"]
+            off = p_args.count("-i") - head["n_inputs"]
+            for c in head["fg"]:
+                fg_p.append(re.sub(r"\[(\d+):", lambda m: f"[{int(m.group(1)) + off}:", c))
+            if is_last:
+                p_args += voice_args
+            for fr in rest:
+                p_args += fr["inputs"]
+                off = p_args.count("-i") - fr["n_inputs"]
+                for c in fr["fg"]:
+                    fg_p.append(re.sub(r"\[(\d+):", lambda m: f"[{int(m.group(1)) + off}:", c))
+        else:
+            p_args += ["-i", str(prev_out)]
+            if is_last:
+                p_args += voice_args
+        group = body[b0:b1]
+        for si_, fr in enumerate(group):
+            # Đánh số lại input trước, rồi mới thay nhãn incoming của span đầu:
+            # làm ngược lại thì [0:v] vừa thay sẽ bị regex coi là chỉ số cục bộ
+            # và bị dịch đi, trỏ nhầm vào ảnh card thay vì file cụm trước.
+            off = p_args.count("-i")
+            chains = [re.sub(r"\[(\d+):", lambda m: f"[{int(m.group(1)) + off}:", c)
+                      for c in fr["fg"]]
+            if si_ == 0 and not is_first:
+                chains = [c.replace(f"[{fr['in_label']}]", "[0:v]") for c in chains]
+            p_args += fr["inputs"]
+            for c in chains:
+                fg_p.append(c)
+        last_out = f"v{b1}"
+        if is_last:
+            fg_p.append(f"[{last_out}]{tail}[vout]")
+            # 5c) âm thanh: giọng đọc + tiếng chuyển mục (pop / whoosh) + nhạc nền
+            fg_p.append("[1:a]anull[a0]")
+            audio_mix = ["[a0]"]
+            pop = opt.pop_in and opt.threads
+            # Card nảy vào ngay từ đầu video (bài post) nên pop cũng kêu từ mục đầu tiên.
+            section_starts = _pop_starts(spans, first=pop)
+            sfx_path = next((m for m in list_music()
+                             if m.name.lower().startswith("pop" if pop else "whoosh")), None)
+            if opt.sfx and section_starts and sfx_path is not None:
+                p_args += ["-i", str(sfx_path)]
+                n = len(section_starts)
+                labels = "".join(f"[w{j}]" for j in range(n))
+                # Pop.mp3 có sẵn ~0.14s im lặng đầu file; cắt đi để tiếng nổ khớp lúc card
+                # phóng tới cỡ lớn nhất chứ không trễ nửa nhịp.
+                trim = ("atrim=start=0.14:end=0.5,afade=t=out:st=0.22:d=0.14,volume=0.50" if pop
+                        else "atrim=0:0.8,volume=0.35")
+                fg_p.append(f"[{p_args.count('-i') - 1}:a]{trim},asetpts=N/SR/TB,asplit={n}{labels}")
+                for j, st in enumerate(section_starts):
+                    ms_ = int(round(st * 1000))
+                    fg_p.append(f"[w{j}]adelay={ms_}|{ms_}[s{j}]")
+                    audio_mix.append(f"[s{j}]")
+            music = list_music() if opt.use_music else []
+            if music:
+                mpath = rng.choice(music)
+                p_args += ["-stream_loop", "-1", "-i", str(mpath)]
+                fg_p.append(f"[{p_args.count('-i') - 1}:a]volume={opt.music_volume:.3f}[mu]")
+                audio_mix.append("[mu]")
+            fg_p.append("".join(audio_mix) + f"amix=inputs={len(audio_mix)}:duration=first:"
+                                           f"dropout_transition=0:normalize=0[aout]")
+            amap = "[aout]"
+            if preview:
+                venc = ["-c:v", "libx264", "-preset", "ultrafast", "-crf", "30"]
+            elif opt.nvenc:
+                venc = ["-c:v", "h264_nvenc", "-preset", "p5", "-rc", "vbr", "-cq", "19", "-b:v", "0"]
+            else:
+                venc = [*CPU_VENC]
+            dst = out_path
+        else:
+            fg_p.append(f"[{last_out}]format=yuv420p[vout]")
+            venc = ["-c:v", "libx264", "-crf", "12", "-preset", "veryfast"]
+            amap = None
+            dst = job / f"pass_{pi_}.mp4"
+        filter_src = ";".join(fg_p)
+        if len(filter_src) > 30000:
+            # Windows chặn dòng lệnh ~32.767 ký tự; graph to vẫn ghi filter ra file,
+            # ffmpeg đọc bằng -/filter_complex (bản ffmpeg 8+ bỏ -filter_complex_script).
+            fpath = (job / f"filter_{pi_}.txt").resolve()
+            fpath.write_text(filter_src, encoding="utf-8")
+            p_args += ["-/filter_complex", str(fpath)]
+        else:
+            p_args += ["-filter_complex", filter_src]
+        p_args += ["-map", "[vout]"]
+        if is_last:
+            p_args += ["-map", amap, "-c:a", "aac", "-q:a", "4", "-movflags", "+faststart"]
+        else:
+            p_args += ["-an"]
+        p_args += [*venc, "-pix_fmt", "yuv420p", "-r", str(fps),
+                   "-t", f"{total:.2f}", str(dst)]
+        cb(0.6 + 0.35 * (pi_ + 1) / len(bounds),
+           f"Đang dựng video… (cụm {pi_ + 1}/{len(bounds)})" if len(bounds) > 1
+           else ("Đang xuất video…" if not preview else "Đang dựng bản xem thử…"))
+        if len(fg_p) > 200:
+            # Graph nhiều node: mỗi overlay cấp phát buffer theo số luồng filter;
+            # các node chủ yếu là overlay bậc thang chỉ đưa ảnh qua nên chạy 1 luồng
+            # gần như không mất tốc độ nhưng giảm mạnh RAM commit.
+            p_args.insert(0, "-filter_complex_threads")
+            p_args.insert(1, "1")
+        try:
+            run_ffmpeg(p_args, job)
+        except RuntimeError as exc:
+            # NVENC hỏng giữa chừng (CreateBitstreamBuffer failed: out of memory trên
+            # card 4GB) thì xuất lại bằng CPU thay vì bỏ cả lần dựng.
+            if preview or not is_last or not opt.nvenc:
+                raise
+            reason = next((line for line in str(exc).splitlines()
+                           if "nvenc" in line.lower()), str(exc).splitlines()[-1])
+            cb(0.96, f"GPU không xuất được ({reason.strip()[:140]}) — xuất lại bằng CPU…")
+            run_ffmpeg(swap_encoder(p_args, venc, [*CPU_VENC]), job)
+        if not is_last:
+            tmp_outs.append(dst)
+        prev_out = dst
+    for t_ in tmp_outs:
+        try:
+            t_.unlink()
+        except OSError:
+            pass
     if not preview:
         # Ghi kèm nguồn nội dung để lúc đăng Facebook biết bài Threads nào đã tạo ra video.
         try:
@@ -1408,20 +1877,3 @@ def analyze(script: str, seed: int | None = None, content: str = "") -> list[lis
     return [[b.idx, b.spoken, b.display if b.display else "-", b.tag, b.clip] for b in beats]
 
 
-def cleanup_old(days: float = 2.0) -> None:
-    """Xóa thư mục job và bản xem thử cũ trong work/ để không đầy ổ đĩa."""
-    import time
-    limit = time.time() - days * 86400
-    for p in WORK_DIR.glob("job_*"):
-        try:
-            if p.stat().st_mtime < limit:
-                shutil.rmtree(p, ignore_errors=True)
-        except OSError:
-            pass
-    for pattern in ("preview_*.mp4", "frame_*.png", "frame_*.ass"):
-        for p in WORK_DIR.glob(pattern):
-            try:
-                if p.stat().st_mtime < limit:
-                    p.unlink()
-            except OSError:
-                pass

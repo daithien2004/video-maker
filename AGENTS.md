@@ -4,11 +4,12 @@
 
 - `videomaker/`: mã nguồn Python; dùng import theo package `videomaker`.
 - `frontend/`: giao diện React/Vite; `src/` là mã nguồn, `dist/` là bản build Python phục vụ.
-- `config/settings.json`: cấu hình giao diện và kịch bản đang làm.
+- `config/settings.json`: chỉ cấu hình giao diện/dựng video; kịch bản video thường và tên nội dung nằm trong `work/video-draft.json`.
 - `docs/`: hướng dẫn sử dụng và sơ đồ thư mục.
 - `tests/`: bài kiểm thử; `tools/`: công cụ phát triển.
 - `assets/`: thư viện nền, ảnh, meme, font và nhạc; `output/`: video hoàn chỉnh.
 - `work/`: dữ liệu tạm và trạng thái đăng nhập/đăng bài. Không xóa toàn bộ thư mục này khi dọn cache.
+- Giữ `work/video-draft.json`, cache voice đã duyệt và checkpoint Threads khi dọn file render cũ.
 - `skills/`: các flow cho AI; `ffmpeg/` và `.venv/`: công cụ và môi trường chạy.
 
 Chạy app bằng `run.bat` hoặc `.venv\Scripts\python.exe -m videomaker` từ thư mục gốc.
@@ -34,15 +35,10 @@ của flow đó: bám nguyên văn nguồn, chỉ chuẩn hóa cách đọc TTS,
 Khi người dùng dán bản thô comment (`# ...png` + các dòng `|| -`) và muốn đọc thành tiếng,
 đọc [skill chuẩn hóa comment](skills/vn-comment-tts-normalize/SKILL.md) và làm đúng quy trình ở đó.
 
-Giao diện **Biên tập Threads** có flow riêng: prepare (code, dựng cha–con và thứ tự)
-→ curate (người dùng tự dùng LLM, bỏ khối dư nhưng giữ nguyên chữ)
-→ normalize (người dùng tự dùng LLM theo quy tắc TTS)
-→ validate (code báo lỗi/cảnh báo theo bước và dòng). Các đầu ra là ô text chỉnh sửa trực tiếp.
-Threads lấy bài/chụp ảnh xong sẽ đưa kịch bản thô thẳng sang Biên tập, không bắt chọn nguồn/JSON lại.
-Kịch bản thô chỉ xử lý ở Biên tập; ô Kịch bản ở Threads chờ bản hoàn chỉnh sau khi validate
-và người dùng bấm chuyển về. Giữ bản thô và metadata riêng với bản đã xử lý.
-Không tích hợp hoặc tự gọi Claude/LLM. Chỉ chuyển bản đã kiểm tra sang trình dựng khi người dùng bấm;
-không tự render, không ghi đè nguồn. Quy tắc UI nằm ở `docs/GIAO_DIEN_REACT.md`.
-Mỗi bài/scan có checkpoint các bước trong `work/threads-script/sessions/`: tự lưu và mở lại được
-sau khi đóng app. Danh sách Bài đã scan mở lại dữ liệu/ảnh sẵn có, không ép scan lại.
-Giữ thư mục checkpoint khi dọn cache. Khôi phục báo cáo cũ để xem, rồi validate lại trước khi dựng.
+Threads lấy bài/chụp ảnh xong: bản thô được đổ thẳng vào ô Kịch bản (nhãn "BẢN CHỈNH") để người dùng
+sửa trực tiếp, không bắt chọn nguồn/JSON lại. Bản thô nguyên văn vẫn giữ trong card "Bản thô"
+(chỉ đọc, có nút sao chép) để đối chiếu; bấm "Lưu kịch bản" mới ghi bản chỉnh vào session.
+Không tích hợp hoặc tự gọi Claude/LLM; không tự render, không ghi đè nguồn Threads.
+Quy tắc UI nằm ở `docs/GIAO_DIEN_REACT.md`.
+Bài đã scan và phiên chỉnh sửa có checkpoint trong `work/threads-script/` (`video-drafts/`, `sessions/`):
+mở lại được sau khi đóng app, không ép scan lại. Giữ thư mục này khi dọn cache.

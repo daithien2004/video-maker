@@ -9,6 +9,7 @@ function stored() {
 export function useJob(notify, completed) {
   const [job, setJob] = useState(stored)
   const callback = useRef(null)
+  const busyNoteAt = useRef(0)
   const handlers = useRef({ notify, completed })
   handlers.current = { notify, completed }
   const busy = job?.status === 'queued' || job?.status === 'running' || job?.status === 'starting'
@@ -55,7 +56,15 @@ export function useJob(notify, completed) {
   }, [job?.id])
 
   async function run(path, body, onDone) {
-    if (active.current) return
+    if (active.current) {
+      if (Date.now() - busyNoteAt.current > 2500) {
+        busyNoteAt.current = Date.now()
+        handlers.current.notify(
+          `Còn tác vụ đang chạy: ${job?.message || 'vui lòng đợi'}. Đợi thông báo kết quả rồi hãy thử lại.`,
+          'error')
+      }
+      return
+    }
     active.current = true
     setJob({ status: 'starting', progress: 0, message: 'Đang gửi yêu cầu…' })
     callback.current = onDone || null

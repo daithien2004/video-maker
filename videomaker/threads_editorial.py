@@ -66,7 +66,8 @@ def validate_script(source, text, *, require_images=True):
     sections = ts.parse_sections(text)
     if not sections or sections[0][0] != items[0].get("image"):
         raise ValueError("Kịch bản phải mở đầu bằng mục ảnh bài gốc.")
-    # Đếm cả mục rỗng vì parse_sections cố ý bỏ các mục không có nhịp.
+    # parse_sections tự nhồi nhịp [sound] cho mục không có lời đọc nên hai đếm luôn khớp;
+    # lệch chỉ xảy ra khi một dòng # không có đường dẫn ảnh.
     headers = [line for line in text.splitlines() if line.strip().startswith("#")]
     if len(headers) != len(sections):
         raise ValueError("Có mục ảnh không có lời đọc hoặc header không hợp lệ.")

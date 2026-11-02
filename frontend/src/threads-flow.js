@@ -13,6 +13,3 @@ export function receiveReviewedThread(current, data) {
   return { ...current, ...data, approved: true, output: null, frame: null, selected: 0 }
 }
 
-export function editorialInput(draft) {
-  return { session: draft.rawSession || '', script: draft.rawScript || '', content: draft.content || '' }
-}

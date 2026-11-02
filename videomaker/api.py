@@ -246,6 +246,11 @@ class RenderRequest(Draft):
     preview: bool = True
 
 
+class VoiceRequest(Draft):
+    index: int | None = None
+    force: bool = False
+
+
 class ScrapeRequest(BaseModel):
     url: str
     content: str = ''
@@ -254,7 +259,6 @@ class ScrapeRequest(BaseModel):
     ident: str = 'avatar'
     nested: bool = True
     reply_depth: int = Field(default=1, ge=1, le=4)
-    reply_min_likes: int = Field(default=10, ge=0)
     reply_per_parent: int = Field(default=2, ge=0, le=100)
 
 
@@ -364,7 +368,11 @@ def create_app() -> FastAPI:
     @api.get('/api/bootstrap')
     def bootstrap():
         config = fb.load_config()
-        return {'api_revision': 5, 'settings': actions.load_settings(), 'defaults': actions.DEFAULTS,
+        cfg = actions.load_settings()
+        return {'api_revision': 6,
+                'settings': {key: value for key, value in cfg.items() if key not in actions.DRAFT_KEYS},
+                'video_draft': {key: cfg[key] for key in actions.DRAFT_KEYS},
+                'defaults': {key: value for key, value in actions.DEFAULTS.items() if key not in actions.DRAFT_KEYS},
                 'backgrounds': actions.bg_choices(), 'contents': pl.list_contents(),
                 'threads_status': ts.session_status().replace('**', ''),
                 'facebook': {'page': config.get('page_id', ''), 'version': config.get('version', fb.DEFAULT_VERSION),
@@ -376,8 +384,18 @@ def create_app() -> FastAPI:
     @api.post('/api/settings')
     def save_settings(body: Draft):
         cfg = settings_with(body.settings)
-        actions.save_settings(**{**cfg, 'script': body.script})
-        return {'message': 'Đã lưu kịch bản và cấu hình.'}
+        updates = {key: cfg[key] for key in body.settings if key in actions.DEFAULTS}
+        # Compatibility for older clients that explicitly submit a draft with settings.
+        if 'script' in body.model_fields_set:
+            updates['script'] = body.script
+        actions.save_settings(**updates)
+        return {'message': 'Đã lưu cấu hình.'}
+
+    @api.post('/api/video-draft')
+    def save_video_draft(body: Draft):
+        cfg = settings_with(body.settings)
+        actions.save_settings(script=body.script, content=cfg['content'])
+        return {'message': 'Đã lưu kịch bản Video thường.'}
 
     @api.post('/api/analyze')
     def analyze(body: Draft):
@@ -427,6 +445,28 @@ def create_app() -> FastAPI:
                                              zoom=zoom)
             return {'file': file_info(image), 'chunks': chunks, 'threads': body.threads}
         return jobs.submit('frame', work)
+
+    @api.post('/api/voice')
+    def voice(body: VoiceRequest):
+        cfg = settings_with(body.settings)
+        validate_rows(body.rows, cfg['content'], threads=body.threads)
+        opt = options(cfg, body.threads)
+
+        def work(progress):
+            items = pl.voice_lines(body.rows, opt, index=body.index, force=body.force,
+                                   cb=lambda value, note: progress(value, desc=note))
+            result = []
+            for item in items:
+                item = dict(item)
+                path = item.pop('path', '')
+                item['file'] = file_info(Path(path)) if path else None
+                result.append(item)
+            single = body.index is not None
+            return {'items': result, 'threads': body.threads,
+                    'message': (f'Đã tạo lại giọng nhịp {result[0]["beat"]}.' if single
+                                else f'Đã tạo giọng đọc cho {len(result)} nhịp.')}
+
+        return jobs.submit('voice', work)
 
     @api.post('/api/voices')
     def voices(body: Draft):
@@ -610,16 +650,16 @@ def create_app() -> FastAPI:
         target = script_store.path_for(script_store.key_for(state))
         if target.is_file():
             saved = script_store.load(target.stem)['draft']
-            result.update(raw_script=saved['raw_script'], edited_script=saved['edited_script'])
+            # Bản thô dựng lại từ nguồn để header luôn theo quy tắc hiện hành; bản lưu cũ
+            # có thể còn đánh dấu "reply của bài" trên comment chính.
+            result.update(raw_script=result['script'], edited_script=saved['edited_script'])
         return result
 
     @api.post('/api/threads/save-script')
     def save_thread_script(body: Draft):
         state = get_session(body.session)
-        target = script_store.path_for(script_store.key_for(state))
-        raw = (script_store.load(target.stem)['draft']['raw_script'] if target.is_file()
-               else ts.build_editable_script(state))
-        result = script_store.save(state, {'raw_script': raw, 'edited_script': body.script})
+        result = script_store.save(state, {'raw_script': ts.build_editable_script(state),
+                                           'edited_script': body.script})
         return {**result, 'message': 'Đã lưu bản thô và bản đã chỉnh.'}
 
     @api.post('/api/threads/scrape')
@@ -631,7 +671,7 @@ def create_app() -> FastAPI:
             raise HTTPException(400, 'Chế độ ảnh không hợp lệ.')
         run = ts.Run(url=body.url, content=actions.safe_name(body.content) if body.content else '',
                      top=body.top, mode=body.mode, ident=body.ident, nested_replies=body.nested,
-                     reply_depth=body.reply_depth, reply_min_likes=body.reply_min_likes,
+                     reply_depth=body.reply_depth,
                      reply_per_parent=body.reply_per_parent)
         return jobs.submit('threads', lambda progress: thread_result(ts.run(run, progress=progress)))
 
@@ -818,7 +858,7 @@ def create_app() -> FastAPI:
                 raise HTTPException(400, 'Chọn video MP4 đã xuất trong output.')
             videos = list(map(str, resolved))
             if action == 'batch-plan':
-                return {'rows': actions.on_fb_edit_rows(videos, body.pattern, body.edits or [], shared=body.caption if body.caption else None)['value']}
+                return {'rows': actions.on_fb_edit_rows(videos, body.pattern, body.edits or [], shared=body.caption if body.caption else None, tags=body.tags)['value']}
             if action == 'batch':
                 return jobs.submit('facebook-batch', lambda progress: {'message': actions.on_fb_batch_schedule(
                     videos, body.pattern, body.caption, body.tags, body.edits, progress=progress)[0]})

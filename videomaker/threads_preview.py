@@ -1,10 +1,9 @@
 """Read-only Threads card metadata for full-frame preview selection."""
 from . import threads_shot as ts
-from .comment_manager import chronological
 
 
 def preview_items(source):
-    items = [source.get('post') or {}] + chronological(source.get('comments') or [])
+    items = [source.get('post') or {}] + list(source.get('comments') or [])
     images = {item.get('rel'): item.get('path') for item in source.get('images') or []}
     result = []
     for index, item in enumerate(items):

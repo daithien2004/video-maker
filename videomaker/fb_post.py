@@ -445,24 +445,6 @@ def keep_tags(tags: str, limit: int = 5) -> list[str]:
     return seen[:limit]
 
 
-def dropped_tags(tags: str, limit: int = 5) -> list[str]:
-    """Tag bị bỏ (chung chung / vượt quá `limit`) để hiện cảnh báo cho người dùng."""
-    from .caption import FIXED_TAGS, GENERIC_TAGS
-
-    valid: list[str] = list(FIXED_TAGS)
-    dropped: list[str] = []
-    for raw in re.split(r"[\s,;]+", tags or ""):
-        t = raw.strip().lstrip("#")
-        if not t:
-            continue
-        if not re.fullmatch(r"\w+", t) or len(t) > 24:
-            dropped.append(t)
-        elif t.lower() in GENERIC_TAGS:
-            dropped.append(t)
-        elif t.lower() not in {s.lower() for s in valid}:
-            valid.append(t)
-    dropped.extend(valid[limit:])
-    return dropped
 
 
 def append_tags(caption: str, tags: str) -> str:

@@ -14,6 +14,7 @@ export { Switch } from '@/components/ui/switch'
 const paths = {
   film: 'M4 3h16v18H4z M4 8h16 M4 16h16 M8 3v5 M16 3v5 M8 16v5 M16 16v5',
   play: 'M9 5l11 7-11 7z',
+  stop: 'M7 7h10v10H7z',
   layers: 'M12 3L2 8l10 5 10-5-10-5z M2 12l10 5 10-5 M2 16l10 5 10-5',
   library: 'M3 4h5v16H3z M11 4h4v16h-4z M18 4l4 15-4 1-4-15',
   threads: 'M18.5 8c-1-4-9-5-12-1-4 6-1 14 6 14 7 0 9-7 4-10-5-3-10 2-6 4 3 2 7-2 5-7',

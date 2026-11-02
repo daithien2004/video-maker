@@ -28,11 +28,11 @@ import shutil
 import sys
 import time
 import unicodedata
-from . import comment_manager as cm
 from . import threads_replies as tr
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from .paths import APP_DIR, configure_browser_temp
 ILLUS_DIR = APP_DIR / "assets" / "illus"
@@ -148,6 +148,8 @@ EXTRACT_JS = r"""
     return {
       handle: (hrefs[0] || '').replace('/@', ''),
       postHref: hrefs.find(h => h.includes('/post/')) || '',
+      // reply nằm lùi vào ~40px so với card cha -> dùng độ lệch này để biết ai là con
+      left: Math.round(c.getBoundingClientRect().left),
       // vùng chứa: "threads_post_page_*" = bài đang mở + reply của nó;
       // "…related…" = post khác do Threads gợi ý ở cuối trang (không phải comment)
       pagelet: (c.closest('[data-pagelet]') || {getAttribute: () => ''}).getAttribute('data-pagelet') || '',
@@ -319,6 +321,7 @@ def card_from_raw(raw: dict) -> dict | None:
         "is_pinned": bool(raw.get("isPinned")),
         "avatar": raw.get("avatar"),
         "pagelet": raw.get("pagelet") or "",
+        "left": raw.get("left"),
     }
 
 
@@ -362,7 +365,6 @@ def split_post(url: str, items: list[dict]) -> tuple[dict | None, list[dict]]:
             continue
         seen.add(key)
         comments.append(c)
-    comments.sort(key=lambda c: c["likes"], reverse=True)
     return post, comments
 
 
@@ -423,19 +425,30 @@ def _fmt_date(iso: str | None) -> str:
         return t[:10]
 
 
-def download_card_media(request, urls):
-    """Download image attachments with the same authenticated browser context."""
-    from PIL import Image, ImageOps
-    from urllib.parse import urlsplit
-    photos = []
-    for url in list(dict.fromkeys(urls))[:10]:
+CARD_MEDIA_HOSTS = ('fbcdn.net', 'cdninstagram.com', 'fbsbx.com', 'threads.com', 'threads.net')
+
+
+def card_media_urls(urls) -> list[str]:
+    """Ảnh card dán được: chỉ host tải được và không phải GIF (GIF ngoài whitelist như
+    Giphy không bao giờ vào card, nên không tính là mục có ảnh)."""
+    out = []
+    for url in list(dict.fromkeys(urls or [])):
         if not isinstance(url, str):
             continue
         parsed = urlsplit(url)
         host = parsed.hostname or ''
-        if parsed.scheme != 'https' or not any(host == domain or host.endswith('.' + domain)
-                for domain in ('fbcdn.net', 'cdninstagram.com', 'fbsbx.com', 'threads.com', 'threads.net')):
+        if parsed.scheme != 'https' or parsed.path.lower().endswith('.gif'):
             continue
+        if any(host == domain or host.endswith('.' + domain) for domain in CARD_MEDIA_HOSTS):
+            out.append(url)
+    return out
+
+
+def download_card_media(request, urls):
+    """Download image attachments with the same authenticated browser context."""
+    from PIL import Image, ImageOps
+    photos = []
+    for url in card_media_urls(urls)[:10]:
         try:
             response = request.get(url, timeout=15_000)
             if not response.ok:
@@ -533,13 +546,14 @@ def render_card(item: dict, out: Path, canvas: tuple[int, int] | None,
         y = body_top + max(0, (avail - ink_h) // 2) - ink_top
     else:                     # canvas = none: card thấp đúng theo nội dung
         # Khung không còn cố định 1080×900 nữa: chữ giữ cỡ ~52px (dễ đọc, đồng đều
-        # giữa các card), card cao bao nhiêu thì cắt bấy nhiêu. Bài dài quá 900px
-        # mới hạ cỡ chữ, cuối cùng mới cắt bớt.
-        cap = 640
+        # giữa các card), card cao bao nhiêu thì cắt bấy nhiêu. Card cao quá 1100px
+        # mới hạ cỡ chữ, cuối cùng mới cắt bớt. Giới hạn cũ 640px làm comment dài
+        # (500–900 ký tự) bị cắt mất nửa nội dung trong khi TTS vẫn đọc đủ.
+        cap = 1100
         size = 52
         lines, line_h, ink_top, ink_h = metrics(text, size)
         ch = body_top + ink_h + 44 + footer_h + pad
-        while ch > cap and size > 30:
+        while ch > cap and size > 28:
             size -= 2
             lines, line_h, ink_top, ink_h = metrics(text, size)
             ch = body_top + ink_h + 44 + footer_h + pad
@@ -639,16 +653,24 @@ def reply_context(source: dict, image: str) -> str:
     if not handle:
         return ''
     snippet = ' '.join((parent.get('text') or '').split())
-    return f'@{handle}: {snippet[:200]}' if snippet else f'@{handle}'
+    if not snippet:
+        # Cha chỉ có ảnh (comment khoe ảnh, không chữ): vẫn phải có trích đoạn để
+        # khung ↳ được vẽ, nếu không reply bị dựng như comment chính.
+        return f'@{handle}: Trả lời ảnh'
+    return f'@{handle}: {snippet[:200]}'
 
 
 def has_media(source: dict, image: str) -> bool:
-    """Mục này có ảnh đính kèm không: bài gốc hoặc comment kèm ảnh."""
+    """Mục này có ảnh card dán được không: bài gốc hoặc comment kèm ảnh.
+
+    Chỉ tính media mà card thật sự chứa (xem `card_media_urls`); GIF Giphy và ảnh ngoài
+    whitelist bị bỏ, nếu không nhịp zoom sẽ phóng to một card chỉ có chữ.
+    """
     entry = next((i for i in source.get('images') or [] if i.get('rel') == image), None)
     if entry and entry.get('kind') == 'post':
-        return bool((source.get('post') or {}).get('media_urls'))
+        return bool(card_media_urls((source.get('post') or {}).get('media_urls')))
     comment = next((c for c in source.get('comments') or [] if c.get('image') == image), None)
-    return bool(comment and comment.get('media_urls'))
+    return bool(comment and card_media_urls(comment.get('media_urls')))
 
 
 def parse_context(context: str) -> tuple[str, str]:
@@ -1025,12 +1047,22 @@ def _merge_comment(acc: dict, c: dict) -> None:
     acc[k] = merged
 
 
+def _root_count(acc: dict) -> int:
+    """Số card không thụt lề = số comment chính đã thấy (reply lồng bị thụt vào)."""
+    lefts = [c['left'] for c in acc.values() if isinstance(c.get('left'), (int, float))]
+    if not lefts:
+        return len(acc)
+    base = min(lefts)
+    return sum(1 for c in acc.values()
+               if isinstance(c.get('left'), (int, float)) and c['left'] - base < tr.INDENT_REPLY_MIN)
+
+
 def crawl(a, progress=None) -> tuple[dict | None, list[dict], dict, dict, int]:
     """Mở trình duyệt một lần: bóc dữ liệu, chụp card cần chụp, tải avatar.
 
-    Threads dùng danh sách ảo: card bị gỡ khỏi DOM khi cuộn qua và thứ tự comment bị
-    xếp lại sau mỗi lượt cuộn. Vì vậy phải gom dần qua từng lượt (đọc một lần ở cuối
-    trang sẽ mất đúng những comment nhiều like nhất — chúng nằm ở đầu trang).
+    Threads dùng danh sách ảo: card bị gỡ khỏi DOM khi cuộn qua. Vì vậy phải gom dần
+    qua từng lượt (đọc một lần ở cuối trang sẽ mất các comment nằm ở đầu trang), và
+    dict `acc` giữ thứ tự lần đầu thấy = thứ tự Threads đang hiển thị.
     """
     configure_browser_temp()
     from playwright.sync_api import sync_playwright
@@ -1067,7 +1099,14 @@ def crawl(a, progress=None) -> tuple[dict | None, list[dict], dict, dict, int]:
         acc: dict[tuple[str, str], dict] = {}
         post: dict | None = None
         passes = max(1, a.scrolls + 1)
-        for step in range(passes):
+        # Trang bài gốc hiện cả reply lồng bên dưới comment cha, nên số card lớn hơn số
+        # comment chính. Cuộn thêm (tối đa 3 lần số lượt) cho tới khi đủ comment chính
+        # theo cài đặt hoặc hết card mới.
+        limit = passes * 3 if a.top > 0 else passes
+        step = 0
+        stall = 0
+        seen = 0
+        while True:
             raws = page.evaluate(EXTRACT_JS)
             items = [c for c in (card_from_raw(r) for r in raws) if c]
             p_now, cmts = split_post(a.url, items)
@@ -1084,19 +1123,27 @@ def crawl(a, progress=None) -> tuple[dict | None, list[dict], dict, dict, int]:
                     post['has_media'] = bool(post.get('has_media') or p_now.get('has_media'))
             for c in cmts:
                 _merge_comment(acc, c)
-            if step + 1 < passes:
-                page.mouse.wheel(0, SCROLL_PX)
-                page.wait_for_timeout(SCROLL_WAIT)
-                dismiss_overlays(page)
+            step += 1
+            # Hết card mới ở 2 lượt cuộn liền = đã tới cuối danh sách, không cuộn thêm.
+            stall = 0 if len(acc) > seen else stall + 1
+            seen = len(acc)
+            if step >= limit or (step >= passes and (a.top <= 0 or stall >= 2 or
+                                                     _root_count(acc) >= a.top)):
+                break
+            page.mouse.wheel(0, SCROLL_PX)
+            page.wait_for_timeout(SCROLL_WAIT)
+            dismiss_overlays(page)
 
         if not post:
             page.close(); ctx.close(); browser.close()
             return None, [], {}, {}, 0
 
-        comments = sorted(acc.values(),
-                          key=lambda c: (c["likes"], c["replies"]), reverse=True)
+        # dict giữ thứ tự lần đầu thấy khi cuộn = đúng thứ tự Threads đang hiển thị.
+        comments = list(acc.values())
         n_found = len(comments)
-        chosen = [post] + (comments[:a.top] if a.top > 0 else comments)
+        # Reply hiện ngay trên trang bài gốc bị thụt lề -> gắn cha trước khi lấy reply
+        # lồng, để comment chính không bị tính lẫn với reply của nó.
+        tr.mark_parents([post] + comments)
 
         # ---- 1b. mở trang chi tiết từng comment để lấy reply lồng, cùng phiên đăng nhập.
         post["url"] = post.get("url") or a.url
@@ -1116,7 +1163,7 @@ def crawl(a, progress=None) -> tuple[dict | None, list[dict], dict, dict, int]:
                             collected[key] = card
                     reply_page.mouse.wheel(0, SCROLL_PX)
                     reply_page.wait_for_timeout(SCROLL_WAIT)
-                return tr.focused_replies(url, list(collected.values()))
+                return tr.observed_thread(url, list(collected.values()), post)
 
             def nested_progress(index, limit, parent):
                 if progress is not None:
@@ -1124,17 +1171,17 @@ def crawl(a, progress=None) -> tuple[dict | None, list[dict], dict, dict, int]:
                              desc=f"Lấy reply trong comment @{parent.get('handle', '?')} ({index + 1}/{limit})…")
             try:
                 replies, nested_stats = tr.collect(
-                    chosen[1:], post, read_thread,
+                    comments, post, read_thread,
                     max_depth=getattr(a, "reply_depth", 2),
-                    max_pages=getattr(a, "reply_pages", 20),
+                    max_pages=max(getattr(a, "reply_pages", 20), a.top),
                     max_replies=getattr(a, "reply_limit", 100), progress=nested_progress,
-                    min_likes=getattr(a, "reply_min_likes", 10),
-                    per_parent=getattr(a, "reply_per_parent", 2))
+                    per_parent=getattr(a, "reply_per_parent", 2), root_limit=a.top)
             finally:
                 reply_page.close()
             chosen = [post] + replies
         else:
-            roots, nested_stats = tr.collect(chosen[1:], post, lambda _url: [], max_depth=0)
+            roots, nested_stats = tr.collect(comments, post, lambda _url: [], max_depth=0,
+                                            root_limit=a.top, per_parent=0)
             nested_stats.update(disabled=True, limited=False, depth_limit=False)
             chosen = [post] + roots
         post["_nested_stats"] = nested_stats
@@ -1442,10 +1489,12 @@ def build_editable_script(result: dict) -> str:
         if not image:
             image = f"{result.get('tag') or 'post'}/" \
                     f"{_image_name(n, item)}"
-        who = "bài gốc" if kind == "post" else (
-            "reply" if (item.get("depth") or 1) >= 2 else f"comment {n - 1}")
+        reply = (item.get("depth") or 1) >= 2
+        who = "bài gốc" if kind == "post" else ("reply" if reply else f"comment {n - 1}")
         bits = [who]
-        if item.get("parent_handle"):
+        # Comment chính cũng có parent_handle trỏ về bài post (lấy từ dải cha trên trang
+        # chi tiết); chỉ reply mới cần nhắc đang đáp lại ai.
+        if reply and item.get("parent_handle"):
             bits.append("↳ @" + item["parent_handle"])
         if item.get("handle"):
             bits.append("@" + item["handle"])
@@ -1537,7 +1586,6 @@ class Run:
     reply_depth: int = 1
     reply_pages: int = 20
     reply_limit: int = 100
-    reply_min_likes: int = 10
     reply_per_parent: int = 2
 
 
@@ -1560,7 +1608,7 @@ def _image_name(i: int, item: dict) -> str:
 def run(r: Run, progress=None) -> dict:
     """Cào bài + comment, ghi ảnh và threads.json. Trả về dữ liệu cho app/CLI.
 
-    `progress(frac, desc="…")` là tuỳ chọn — app truyền gr.Progress vào để thanh chạy.
+    `progress(frac, desc="…")` là tuỳ chọn — api truyền callback tiến trình vào để thanh chạy.
     """
     def say(frac: float, msg: str) -> None:
         if progress is not None:
@@ -1579,8 +1627,6 @@ def run(r: Run, progress=None) -> dict:
     if not post:
         raise RuntimeError("Không đọc được bài nào. Thử đăng nhập (--login) "
                            "hoặc mở trình duyệt (--show).")
-    # crawl đã chọn top theo like; chỉ đổi thứ tự phát của chính nhóm đã chọn.
-    comments = cm.chronological(comments)
 
     content = (r.content or "").strip() or slug(post["handle"])
     tag = slug(r.tag)
@@ -1684,7 +1730,6 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--no-nested-replies", action="store_true", help="chỉ lấy comment ngoài cùng")
     ap.add_argument("--reply-depth", type=int, choices=range(1, 5), default=1,
                     help="số lớp reply lồng tối đa (mặc định 1)")
-    ap.add_argument("--reply-min-likes", type=int, default=10, help="like tối thiểu của reply")
     ap.add_argument("--reply-per-parent", type=int, default=2, help="reply tối đa mỗi comment cha")
     a = ap.parse_args(argv)
 
@@ -1692,7 +1737,7 @@ def main(argv: list[str] | None = None) -> int:
             out=a.out, canvas=a.canvas, max_chars=a.max_chars, scrolls=a.scrolls,
             login=a.login, show=a.show, dry_run=a.dry_run,
             nested_replies=not a.no_nested_replies, reply_depth=a.reply_depth,
-            reply_min_likes=max(0, a.reply_min_likes), reply_per_parent=max(0, a.reply_per_parent))
+            reply_per_parent=max(0, a.reply_per_parent))
 
     print(f"Đang mở {a.url} …")
     try:

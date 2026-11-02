@@ -66,7 +66,8 @@ Các mục giao diện Gradio phía dưới được giữ để tham khảo b�
  3. "2. Xem thử nhanh" (bản nhẹ 540x960) -> thấy ổn thì "3. Xuất video đẹp".
  4. Video xuất ra nằm trong thư mục output\ (H.264, 1080x1920, 30fps, CRF 18, âm thanh AAC 192k) - đăng thẳng lên TikTok được.
  5. Không phải chỉnh lại thông số mỗi lần mở: app TỰ LƯU mọi thông số (giọng, tốc độ, font, cỡ chữ,
-    màu, vị trí khung meme, nhạc nền...) và cả kịch bản vào file config/settings.json ngay khi bạn đổi.
+    màu, vị trí khung meme, nhạc nền...) vào config/settings.json; bản kịch bản và tên nội dung
+    được lưu riêng trong work/video-draft.json khi bấm lưu kịch bản.
     Mở lại app là có sẵn như lần trước. Có nút "Lưu cấu hình" để lưu ngay và xem thông báo.
     Muốn quay về mặc định: đóng app rồi xóa file config/settings.json trong thư mục này.
 

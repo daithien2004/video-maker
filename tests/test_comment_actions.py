@@ -43,7 +43,7 @@ class CommentActionTests(unittest.TestCase):
         self.assertEqual([c["handle"] for c in deleted[0]["comments"]], ["user1", "user3"])
 
     def test_missing_or_already_deleted_comment_does_not_affect_another(self):
-        with self.assertRaises(app.gr.Error):
+        with self.assertRaises(app.AppError):
             app.on_threads_comment_action(
                 self.state, self.rows, self.script, "post/missing.png", "delete")
         self.assertEqual(len(self.state["comments"]), 3)

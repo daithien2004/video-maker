@@ -10,16 +10,22 @@ trên thanh đầu trang đổi sáng/tối và nhớ lựa chọn trên trình 
 
 1. Nhập tên nội dung trùng thư mục minh họa trong `assets/illus/`.
 2. Dán kịch bản đã chuẩn bị hoặc mở file `.txt`. Mỗi dòng theo format `[thẻ] lời đọc || chữ hiển thị`.
-3. Bấm **Phân tích kịch bản**. Trong **Các nhịp**, sửa lời đọc, chữ, thứ tự hoặc chọn media từ thư viện.
-4. Bấm **Xem khung nhịp** để kiểm tra hình, hoặc **Dựng bản xem thử** để dựng MP4 chất lượng thấp.
-5. Khi đã kiểm tra xong, bấm **Xuất video đẹp**. Thành phẩm xuất hiện trong **Video đã xuất**.
+3. Bấm **Tạo nhịp và voice** để chia nhịp và tạo giọng từ cùng một bản kịch bản. Lời không đổi dùng lại voice đã có. Khi sửa kịch bản, bấm nút này lại để đồng bộ cả hai trước khi xuất.
+4. **Các nhịp** dùng để sửa chữ hiển thị, media và zoom. Tab **Voice** có nghe từng đoạn, **Nghe liên tục** và **Dừng nghe**. Khi thấy đoạn sai, bấm **Sửa lời đọc**, sửa ngay tại đó rồi **Lưu và tạo lại voice**. Thao tác này cập nhật đúng dòng trong kịch bản tổng và lời đọc của nhịp, chỉ tạo lại âm thanh đoạn vừa sửa, giữ nguyên hình và chữ hiển thị. Có thể **Lưu lời đọc** rồi tạo voice sau. Thêm/xóa hoặc đổi thứ tự dòng thực hiện ở **Kịch bản** rồi bấm **Tạo nhịp và voice** lại. Đổi giọng hoặc tốc độ rồi bấm **Cập nhật voice theo giọng đã chọn**.
+5. Khi đã kiểm tra xong, bấm **Xuất video đẹp**. Video dùng lại voice đã tạo; không cần dựng bản xem thử trước. Thành phẩm xuất hiện trong **Video đã xuất**. Có thể dùng **Xem khung nhịp** để kiểm tra hình riêng.
+
+Xuất hoàn chỉnh giữ độ phân giải 1080×1920 và FPS bạn chọn. Ảnh tĩnh được tái sử dụng;
+nền zoom dùng bộ lọc đầu ra kích thước cố định để giảm tính lại. Preview dùng tối đa
+30 FPS ở 540×960 cho nhẹ hơn; việc này không hạ FPS hoặc chất lượng bản xuất hoàn chỉnh.
 
 **Thiết lập video** chứa giọng đọc, tốc độ, nghỉ giữa nhịp, nền, nhạc, phụ đề, bố cục và GPU.
 Nút **Xem thử bố cục · 1 hình** nằm ngay đầu trang Video thường và Threads. Có thể nhập câu thử,
 chọn ảnh/meme rồi tạo một ảnh khung hình mà không cần phân tích kịch bản, tạo giọng hay render video.
 Ảnh preview có thể mở lớn và tải về; nhịp reply đã có ngữ cảnh sẽ giữ thông tin cha trong preview.
-**Lưu cấu hình** lưu kịch bản video thường và thông số dùng chung vào `config/settings.json`.
-Nút tải bên cạnh tab kịch bản tải bản `.txt`; nếu đã sửa bảng nhịp, file dùng nội dung bảng hiện tại.
+**Lưu thiết lập** ghi thông số dùng chung vào `config/settings.json`. **Lưu kịch bản** ghi
+kịch bản video thường và tên nội dung vào `work/video-draft.json`; hai thao tác không ghi đè nhau.
+App tự chuyển kịch bản trong cấu hình cũ sang file bản thảo khi mở lại.
+Nút tải bên cạnh tab kịch bản tải bản `.txt` của kịch bản nguồn hiện tại.
 
 Flow AI vẫn là: người dùng đưa bản thô → AI biên tập giọng chia sẻ/cập nhật, tìm và lưu ảnh/meme →
 bàn giao kịch bản để người dùng kiểm tra và tự làm tiếp. Giao diện không tự viết lại nội dung hay tự render.
@@ -27,64 +33,36 @@ bàn giao kịch bản để người dùng kiểm tra và tự làm tiếp. Gia
 ## Threads
 
 Dán link bài và bấm **Lấy bài**, hoặc mở bài đã lưu. Có thể đăng nhập Threads, chọn chế độ ảnh,
-số comment và giới hạn reply trong phần tùy chọn. Khi lấy bài/chụp ảnh xong, app tự chuyển
-kịch bản thô và ánh xạ ảnh sang **Biên tập Threads**. Ô Kịch bản ở Threads chưa nhận bản thô.
+số comment và giới hạn reply trong phần tùy chọn. Lấy bài/chụp ảnh xong, bản thô được đổ thẳng
+vào ô **Kịch bản** (nhãn **BẢN CHỈNH**) để sửa trực tiếp; bản thô nguyên văn vẫn giữ trong card
+**Bản thô** (chỉ đọc, có nút **Sao chép**) để đối chiếu. Lấy bài mới sẽ thay kịch bản bằng bản thô
+mới và xóa nhịp, preview cũ.
 
-Xử lý đủ bốn bước trong Biên tập, kiểm tra rồi bấm **Dùng trong trình dựng Threads**.
-Chỉ lúc đó bản hoàn chỉnh mới được điền vào ô Kịch bản ở Threads để dựng/xuất video.
-Reply giữ ngữ cảnh cha; `|| -` giữ trạng thái không phụ đề. Mỗi nhịp có chip **Zoom**: bật thì
-card phóng to theo **Độ zoom** trong bố cục và ẩn phụ đề; mục có ảnh đính kèm (bài gốc hoặc
-comment) tự được thêm một nhịp zoom ở cuối, đi kèm nhạc. Lấy bài mới hoặc đổi danh sách comment
-sẽ hủy bản hoàn chỉnh cũ và đưa bản thô mới trở lại Biên tập.
+**Số comment chính** là số mục cha được lấy theo đúng thứ tự hiển thị trên trang, không
+tính reply vào chỉ tiêu này. **Reply mỗi comment** giới hạn số reply của từng cha; không có
+ngưỡng like tối thiểu, reply 0 like vẫn được lấy. Không xếp lại theo like hay thời gian:
+comment chính theo thứ tự lướt, reply đầu tiên của mỗi cha đứng ngay sau cha. Reply lồng
+sâu hơn theo **Độ sâu reply**. Reply hiện ngay trên trang bài gốc được nhận cha theo thụt lề
+(card lùi vào ~40px là con của card phía trên), nên bản thô ghi đúng `reply ↳ @cha` chứ không
+tính thành comment chính.
+Nếu Threads không tải đủ hoặc chạm giới hạn số trang, app báo kết quả có thể thiếu reply.
 
-## Biên tập Threads theo 4 bước
+Sửa kịch bản tại ô **Kịch bản** rồi bấm **Lưu kịch bản** để ghi bản chỉnh vào phiên bài đang làm,
+sau đó bấm **Tạo nhịp và voice** để chia nhịp và tạo giọng. Reply giữ ngữ cảnh cha; `|| -` giữ
+trạng thái không phụ đề. Mỗi nhịp có chip **Zoom**: bật thì card phóng to theo **Độ zoom** trong
+bố cục và ẩn phụ đề; mục có ảnh đính kèm (bài gốc hoặc comment) tự được thêm một nhịp zoom ở cuối,
+đi kèm nhạc. Chỉ tính ảnh card dán được (host `fbcdn`/`cdninstagram`/`fbsbx`/`threads`); GIF Giphy
+và ảnh ngoài whitelist bị bỏ nên không sinh nhịp zoom. Mục chỉ có ảnh (nhịp `[sound]`) thì chính
+nhịp đó được bật zoom luôn, không thêm nhịp thứ hai — tiếng không bị phát lặp hai lần.
+Nhịp zoom tự sinh có nút thùng rác (chỉ hiện trên nhịp `[zoom]` không có trong kịch bản): bấm là
+xoá nhịp đó và app gắn `[nozoom]` vào dòng `#` của mục, nên **Tạo nhịp và voice** lần sau không
+thêm lại. Muốn bỏ phóng to mà vẫn giữ tiếng thì tắt chip **Zoom** thay vì xoá nhịp.
 
-Tab này nhận trực tiếp bản thô từ bài đang làm ở **Threads**, không yêu cầu chọn bài nguồn,
-mở JSON hoặc nhập lại kịch bản. Mở từ thanh bên cũng tiếp tục đúng bản đang làm.
-Nếu chưa lấy bài, UI hướng dẫn quay về Threads. Mọi bản thảo đều là ô text chỉnh sửa trực tiếp.
-
-**Làm tiếp vào lần sau:** danh sách **Tiếp tục bài đã scan** hiển thị cả các bài đã lấy trước đây
-và các phiên biên tập đã lưu. Bấm **Mở để tiếp tục** để dùng ảnh/dữ liệu có sẵn, không scan lại.
-Nếu đã có phiên lưu, app khôi phục bản thô, nguồn cha–con, curated, TTS, bước đang làm và báo cáo kiểm tra.
-Khi mở Biên tập mà chưa có bài đang làm, app tự mở phiên được lưu gần nhất.
-
-Các bước tự lưu sau khi ngừng chỉnh khoảng 0,8 giây. Nút **Lưu phiên** lưu ngay; kiểm tra trạng thái
-**Đã tự lưu** trước khi đóng app. Phiên nằm trong `work/threads-script/sessions/`, tồn tại sau khi đóng
-trình duyệt hoặc khởi động lại Python. Không xóa thư mục này khi dọn file render tạm.
-Bài scan cũ chưa có phiên vẫn mở lại và tạo bản thô từ `threads.json` có sẵn; không cần lấy bài lại.
-
-1. **Prepare (code):** dựng nhóm cha–con, đặt cha trước reply và cũ trước mới trong từng nhóm;
-   hiện cây nguồn và **Kịch bản thô nhận từ Threads**. Không tự loại comment hay sửa chữ.
-   Có thể chỉnh bản thô ở đây rồi bấm **Prepare & sang Curate** để chuẩn bị lại;
-   curated được đối chiếu đúng bản thô vừa chốt, ảnh và quan hệ cha–con giữ từ bài đã lấy.
-2. **Curate (bạn + LLM bên ngoài):** lấy prompt kèm nguồn, tự gửi cho LLM rồi dán kết quả vào
-   **Bản tuyển chọn nguyên văn**. Chỉ bỏ khối dư sau khi xét cả hội thoại; giữ nguyên chữ của mục được giữ.
-   Có nút bắt đầu từ nguyên văn nếu muốn tự tuyển chọn bằng tay.
-3. **Normalize (bạn + LLM bên ngoài):** lấy prompt quy tắc TTS, dán kết quả vào
-   **Bản đã chuẩn hóa TTS**. Giữ nguyên mục ảnh/thứ tự từ curated; mỗi nhịp là `lời đọc || -`.
-4. **Validate (code):** kiểm tra nguyên văn của curated, thứ tự cha–con, header/ảnh,
-   hai vế `|| -`, mục bị thêm/bỏ giữa curate và normalize, cùng các dấu hiệu viết tắt/số còn sót.
-   Mỗi lỗi có bước và dòng; bấm lỗi để quay về đúng ô. Sửa text sẽ hủy kết quả cũ, cần kiểm tra lại.
-
-Trạng thái có ba mức: **Chưa đạt**, **Đạt cấu trúc — cần rà**, **Đạt kiểm tra bằng code**.
-Code không chứng minh được normalize giữ đúng nghĩa, tên riêng hoặc mức giọng; vẫn cần tự đọc đối chiếu.
-Không dùng độ dài hay thời lượng ước tính để tự bỏ comment.
-
-Có thể sao chép hoặc tải `source.txt`, `curated.txt` và `tts-cleaned.txt` riêng.
-Chỉ khi bấm **Dùng trong trình dựng Threads**, app kiểm tra lại ảnh và nạp bản thảo sang trình dựng;
-không render video, không tự gọi LLM, không ghi đè file nguồn. Vẫn có thể tải các bản text riêng nếu cần.
-Kết quả kiểm tra lần trước được khôi phục để xem; cần bấm **Kiểm tra lại** trước khi chuyển sang trình dựng
-vì ảnh hoặc dữ liệu trên máy có thể đã thay đổi.
+Bài đã scan và bản kịch bản đã lưu của phiên nằm trong `work/threads-script/`: mở lại từ danh sách
+**Mở bài** dùng ảnh và dữ liệu có sẵn, không cần lấy bài lại. Không xóa thư mục này khi dọn file
+render tạm.
 
 ## Thư viện và video đã xuất
-
-### Duyệt mẫu thiết kế thẻ Threads
-
-Nút **Xem mẫu thiết kế ảnh Threads** mở trang `/design/threads.html` với ba mẫu đồng bộ:
-bài gốc, bình luận và reply có trích ngữ cảnh cha. Có thể thử cỡ chữ, bo góc, màu chữ và nền,
-tải từng mẫu SVG hoặc sao chép thông số để trao đổi trước khi áp dụng một thiết kế chung.
-Đây là nội dung minh họa để duyệt bố cục, chưa áp lên ảnh đã scan hoặc bộ dựng video.
-Trang mẫu cũng có nút riêng **Mẫu thiết kế Threads** trong thanh điều hướng bên trái và đầu trang Threads.
 
 **Thư viện media** hỗ trợ tìm kiếm, lọc, xem file, tải thêm ảnh/video/nhạc/font và xóa từng file.
 Minh họa được lưu theo nội dung và thẻ, meme theo thẻ cảm xúc. File mới có tên riêng để không ghi đè file cũ.

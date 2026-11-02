@@ -40,6 +40,50 @@ class ImageSoundTests(unittest.TestCase):
             zoom_audio = pl.beat_audio('[zoom]', pl.Options(threads=True))
             np.testing.assert_array_equal(audio, zoom_audio)
 
+    def test_image_only_section_zooms_the_sound_beat_instead_of_repeating_it(self):
+        source = {'content': 'demo', 'post': {'text': 'Hello', 'image': 'post/main.png'},
+                  'comments': [{'text': '', 'image': 'post/photo.png', 'depth': 1,
+                                'media_urls': ['https://scontent.cdninstagram.com/photo.jpg']}],
+                  'images': [{'rel': 'post/main.png', 'kind': 'post'},
+                             {'rel': 'post/photo.png', 'kind': 'cmt'}]}
+        script = '# post/main.png\nHello || -\n\n# post/photo.png\n[sound] || -\n'
+        rows = app.on_threads_build(script, source)[1]
+        self.assertEqual([row[1] for row in rows], ['Hello', '[sound]'])
+        self.assertEqual(rows[1][6], '1')
+
+    def test_text_with_image_section_still_gets_one_zoom_beat(self):
+        source = {'content': 'demo', 'post': {'text': '', 'image': 'post/photo.png'},
+                  'comments': [{'text': 'Xem ảnh', 'image': 'post/photo.png', 'depth': 1,
+                                'media_urls': ['https://scontent.cdninstagram.com/photo.jpg']}],
+                  'images': [{'rel': 'post/photo.png', 'kind': 'cmt'}]}
+        rows = app.on_threads_build('# post/photo.png\nXem ảnh || -\n', source)[1]
+        self.assertEqual([row[1] for row in rows], ['Xem ảnh', '[zoom]'])
+        self.assertEqual(rows[0][6], '')
+        self.assertEqual(rows[1][6], '1')
+
+    def test_nozoom_marker_keeps_auto_zoom_beat_out_of_the_section(self):
+        source = {'content': 'demo', 'post': {'text': '', 'image': 'post/photo.png'},
+                  'comments': [{'text': 'Xem ảnh', 'image': 'post/photo.png', 'depth': 1,
+                                'media_urls': ['https://scontent.cdninstagram.com/photo.jpg']}],
+                  'images': [{'rel': 'post/photo.png', 'kind': 'cmt'}]}
+        script = '# post/photo.png [nozoom]   (comment 1 · @a · 1 like)\nXem ảnh || -\n'
+        self.assertEqual(ts.parse_sections(script)[0][0], 'post/photo.png')
+        rows = app.on_threads_build(script, source)[1]
+        self.assertEqual([row[1] for row in rows], ['Xem ảnh'])
+        script = script.replace(' [nozoom]', '')
+        rows = app.on_threads_build(script, source)[1]
+        self.assertEqual([row[1] for row in rows], ['Xem ảnh', '[zoom]'])
+
+    def test_nozoom_marker_keeps_image_only_sound_beat_from_zooming(self):
+        source = {'content': 'demo', 'post': {'text': '', 'image': 'post/photo.png'},
+                  'comments': [{'text': '', 'image': 'post/photo.png', 'depth': 1,
+                                'media_urls': ['https://scontent.cdninstagram.com/photo.jpg']}],
+                  'images': [{'rel': 'post/photo.png', 'kind': 'cmt'}]}
+        script = '# post/photo.png [nozoom]\n[sound] || -\n'
+        rows = app.on_threads_build(script, source)[1]
+        self.assertEqual([row[1] for row in rows], ['[sound]'])
+        self.assertEqual(rows[0][6], '')
+
     def test_zoom_beat_keeps_same_image_but_separate_visual_span(self):
         source = {'post': {'text': 'Hello', 'image': 'post/photo.png'}, 'comments': []}
         rows = app.on_threads_build('# post/photo.png\nHello || -\n[zoom] || -', source)[1]

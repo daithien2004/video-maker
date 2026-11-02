@@ -86,9 +86,23 @@ class LocalAPITests(unittest.TestCase):
         response = self.client.post('/api/settings', json={'script': 'Bản đã lưu', 'settings': {'speed': 1.1, 'content': ''}})
         self.assertEqual(response.status_code, 200)
         cfg = json.loads(actions.SETTINGS_FILE.read_text(encoding='utf-8'))
-        self.assertEqual(cfg['script'], 'Bản đã lưu')
+        self.assertNotIn('script', cfg)
+        self.assertNotIn('content', cfg)
+        draft = json.loads((self.root / 'work/video-draft.json').read_text(encoding='utf-8'))
+        self.assertEqual(draft['script'], 'Bản đã lưu')
         self.assertEqual(cfg['speed'], 1.1)
         self.assertFalse((self.root / 'settings.json').exists())
+
+    def test_settings_save_preserves_draft_and_bootstrap_separates_it(self):
+        response = self.client.post('/api/video-draft', json={'script': 'Keep my draft', 'settings': {'content': 'demo'}})
+        self.assertEqual(response.status_code, 200)
+        response = self.client.post('/api/settings', json={'settings': {'speed': 1.2}})
+        self.assertEqual(response.status_code, 200)
+        boot = self.client.get('/api/bootstrap').json()
+        self.assertNotIn('script', boot['settings'])
+        self.assertNotIn('content', boot['settings'])
+        self.assertEqual(boot['settings']['speed'], 1.2)
+        self.assertEqual(boot['video_draft'], {'script': 'Keep my draft', 'content': 'demo'})
 
     def test_upload_and_delete_only_target_asset_files(self):
         response = self.client.post('/api/library/upload', data={'kind': 'illus', 'tag': 'sun', 'content': 'space'},
@@ -129,6 +143,24 @@ class LocalAPITests(unittest.TestCase):
             response = self.client.post('/api/settings', json={'settings': {'content': '../bad'}})
             self.assertEqual(response.status_code, 400)
             render.assert_not_called()
+
+    def test_voice_job_serves_cached_files_and_regenerates_one_beat(self):
+        rows = [[1, 'Xin chào', '', '', ''], [2, 'Tạm biệt', '', '', '']]
+        body = {'rows': rows, 'settings': {'backend': 'dummy'}}
+        result = self.wait_job(self.client.post('/api/voice', json=body).json()['id'])
+        self.assertEqual(result['status'], 'done')
+        items = result['result']['items']
+        self.assertEqual([item['beat'] for item in items], [1, 2])
+        for item in items:
+            self.assertEqual(item['kind'], 'voice')
+            self.assertTrue(item['file']['url'].startswith('/api/media?path='))
+            self.assertEqual(self.client.get(item['file']['url']).status_code, 200)
+        again = self.wait_job(self.client.post('/api/voice', json=body).json()['id'])
+        self.assertTrue(all(item['cached'] for item in again['result']['items']))
+        single = self.wait_job(self.client.post('/api/voice', json={**body, 'index': 1, 'force': True}).json()['id'])
+        self.assertEqual([item['beat'] for item in single['result']['items']], [2])
+        self.assertFalse(single['result']['items'][0]['cached'])
+        self.assertIn('nhịp 2', single['result']['message'])
 
     def test_posted_status_uses_video_filename(self):
         result = self.client.get('/api/outputs').json()['items']
@@ -271,12 +303,13 @@ class LocalAPITests(unittest.TestCase):
     def test_scan_options_persist_without_changing_script(self):
         before = actions.load_settings()
         options = {'top': 35, 'mode': 'card', 'ident': 'anon', 'nested': True,
-                   'reply_depth': 2, 'reply_min_likes': 5, 'reply_per_parent': 4}
+                   'reply_depth': 2, 'reply_per_parent': 4}
         response = self.client.post('/api/threads/options', json=options)
         self.assertEqual(response.status_code, 200, response.text)
-        restored = TestClient(api.create_app()).get('/api/bootstrap').json()['settings']
+        restored_boot = TestClient(api.create_app()).get('/api/bootstrap').json()
+        restored = restored_boot['settings']
         self.assertEqual(restored['threads_scrape'], options)
-        self.assertEqual(restored['script'], before['script'])
+        self.assertEqual(restored_boot['video_draft']['script'], before['script'])
         self.assertEqual(restored['voice'], before['voice'])
         self.assertEqual(self.client.post('/api/threads/options', json={'top': -1}).status_code, 400)
         self.assertEqual(actions.load_settings()['threads_scrape'], options)

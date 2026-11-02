@@ -62,6 +62,22 @@ class ContextCardTests(unittest.TestCase):
         with Image.open(out) as im:
             self.assertLess(im.size[1], 640)   # khung thấp hơn vì không còn dòng tên
 
+    def test_reply_to_image_only_parent_still_gets_context_strip(self):
+        source = {
+            'post': {'id': 'ROOT', 'handle': 'author', 'text': 'Post'},
+            'comments': [
+                {'id': 'P', 'handle': 'cha', 'text': '', 'image': 'post/cha.png', 'depth': 1},
+                {'id': 'R', 'handle': 'con', 'text': 'Trả lời', 'image': 'post/con.png',
+                 'depth': 2, 'parent_id': 'P'}],
+        }
+        context = ts.reply_context(source, 'post/con.png')
+        self.assertEqual(ts.parse_context(context), ('cha', 'Trả lời ảnh'))
+        reply = _reply_image(self.dir / "con.png", h=300)
+        out = self.dir / "img_parent.png"
+        self.assertEqual(ts.context_card(reply, context, out, max_h=640), out)
+        with Image.open(out) as im:
+            self.assertGreater(im.size[1], 300)   # có khung ↳ phía trên ảnh reply
+
     def test_editable_script_marks_reply_with_its_parent(self):
         result = dict(
             post=dict(handle="author", text="Post", image="post/main.png"),

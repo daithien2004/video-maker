@@ -206,6 +206,9 @@ input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--primary)
 .beat-zoom:hover { color: var(--foreground); border-color: var(--foreground); }
 .beat-zoom.on { background: var(--foreground); border-color: var(--foreground); color: var(--background); }
 .beat-zoom:disabled { opacity: .4; cursor: not-allowed; }
+.beat-drop { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: 1px solid var(--input); border-radius: 999px; background: transparent; color: var(--muted-foreground); }
+.beat-drop:hover { color: var(--foreground); border-color: var(--foreground); }
+.beat-drop:disabled { opacity: .4; cursor: not-allowed; }
 .beat-fields { display: grid; grid-template-columns: minmax(0, 1fr) 92px; gap: 10px; }
 .beat-fields > div { display: flex; flex-direction: column; gap: 8px; }
 .beat-fields textarea { font-size: 13px; padding: 7px 9px; line-height: 1.6; min-height: 56px; }
@@ -739,3 +742,22 @@ input[data-slot="input"]:focus-visible, textarea[data-slot="textarea"]:focus-vis
 @media (prefers-reduced-motion: reduce) {
   *, *:before, *:after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
+.voice-panel { padding: 20px; }
+.voice-toolbar, .voice-toolbar-actions, .voice-line, .voice-meta { display: flex; align-items: center; gap: 12px; }
+.voice-toolbar { justify-content: space-between; flex-wrap: wrap; margin-bottom: 18px; }
+.voice-toolbar-actions { flex-wrap: wrap; }
+.voice-summary strong { font-size: 24px; }
+.voice-summary small, .voice-summary span, .voice-meta small { color: var(--muted-foreground); font-size: 12px; }
+.voice-summary span { display: block; margin-top: 4px; }
+.voice-line { padding: 16px 0; border-bottom: 1px solid var(--border); }
+.voice-line.playing { background: var(--muted); }
+.voice-play { border: 1px solid var(--border); border-radius: 50%; padding: 10px; background: var(--muted); color: var(--foreground); cursor: pointer; }
+.voice-play:disabled { opacity: .4; cursor: default; }
+.voice-text { flex: 1; min-width: 0; }
+.voice-inline-edit textarea { width: 100%; margin-top: 8px; }
+.voice-inline-edit small { display: block; color: var(--muted-foreground); margin: 8px 0; }
+.voice-text p { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 6px; }
+.voice-beat, .voice-chip { font-size: 11px; color: var(--muted-foreground); }
+.voice-chip.stale { color: #d97706; }
+.voice-meta { flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 600px) { .voice-line { flex-wrap: wrap; } .voice-meta { width: 100%; } }

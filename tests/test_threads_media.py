@@ -47,6 +47,14 @@ class ThreadsMediaTests(unittest.TestCase):
                 self.assertEqual(image.getpixel((540, image.height - 220)), (10, 90, 220))
                 self.assertEqual(image.width, 1080)
 
+    def test_has_media_counts_only_attachments_the_card_can_show(self):
+        source = {'post': {'media_urls': []}, 'images': [{'rel': 'post/19.png', 'kind': 'cmt'}],
+                  'comments': [{'image': 'post/19.png',
+                                'media_urls': ['https://media0.giphy.com/media/x/200.gif']}]}
+        self.assertFalse(ts.has_media(source, 'post/19.png'))
+        source['comments'][0]['media_urls'] = ['https://scontent.cdninstagram.com/photo.jpg']
+        self.assertTrue(ts.has_media(source, 'post/19.png'))
+
     def test_scroll_merge_keeps_attachments_from_earlier_pass(self):
         acc = {}
         item = {'handle': 'a', 'text': 'photo', 'media_urls': ['https://scontent.cdninstagram.com/p.jpg']}

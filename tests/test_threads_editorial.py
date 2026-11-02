@@ -47,22 +47,17 @@ class EditorialTests(unittest.TestCase):
         cases = [self.text.replace("post/parent.png", "post/unknown.png"),
                  self.text.replace("# post/parent.png\nAn edited parent statement || KEYWORD\n", ""),
                  self.text.replace("An edited reply with context || -", "No separator"),
-                 self.text.replace("A source-based introduction || *INTRO*", ""),
                  self.text + "# post/main.png\nRepeated || REPEATED\n"]
         for text in cases:
             with self.subTest(text=text), self.assertRaises(ValueError):
                 editorial.validate_script(self.source, text)
 
-    def test_import_updates_curated_state_and_preserves_original_pool(self):
-        draft = Path(self.temp.name) / "ready.txt"
-        text = self.text.split("# post/reply.png")[0]
-        draft.write_text(text, encoding="utf-8")
-        result = app.on_threads_import_script(str(draft), self.source)
-        self.assertEqual([c["id"] for c in result[0]["comments"]], ["P"])
-        self.assertEqual(len(result[2]), 2)
-        self.assertTrue((Path(self.temp.name) / "threads-source.json").is_file())
-        self.assertIn("KEYWORD", result[4])
-        self.assertIsNone(result[9])
+    def test_empty_section_becomes_sound_beat(self):
+        text = self.text.replace("A source-based introduction || *INTRO*", "")
+        report = editorial.validate_script(self.source, text)
+        self.assertEqual(report["images"], ["post/main.png", "post/parent.png", "post/reply.png"])
+        self.assertEqual(ts.parse_sections(text)[0][1], ["[sound] || -"])
+
 
     def test_no_sub_survives_conversion_and_reorder(self):
         from unittest.mock import patch

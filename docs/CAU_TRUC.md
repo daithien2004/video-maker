@@ -14,6 +14,7 @@ VideoMaker/
 │   ├── api.py             API FastAPI, tác vụ nền và phục vụ React
 │   ├── editorial_store.py Lưu/khôi phục tất cả bước biên tập theo từng scan
 │   ├── paths.py           Đường dẫn gốc và cấu hình
+│   ├── settings_store.py  Tách thiết lập khỏi bản thảo, chuyển dữ liệu cũ tự động
 │   ├── app.py             Các thao tác dùng chung và giao diện Gradio cũ
 │   ├── pipeline.py        TTS, ghép media và dựng video
 │   ├── caption.py         Caption và hashtag
@@ -30,12 +31,13 @@ VideoMaker/
 │   ├── package.json       Thư viện và lệnh build
 │   └── package-lock.json  Khóa phiên bản thư viện
 ├── config/
-│   └── settings.json      Cấu hình giao diện và kịch bản đang làm
+│   └── settings.json      Chỉ cấu hình giao diện và dựng video
 ├── docs/                  Hướng dẫn sử dụng và cấu trúc dự án
 ├── tests/                 Các bài kiểm thử test_*.py
 ├── tools/
 │   ├── dev.py             Theo dõi code, build React và khởi động lại app
-│   └── check_react_ui.py  Kiểm tra giao diện bằng Playwright
+│   ├── check_react_ui.py  Kiểm tra giao diện bằng Playwright
+│   └── profile_render.py  Đo mẫu dựng ngắn, không tạo TTS hay video thành phẩm
 ├── skills/                Hướng dẫn làm việc cho AI
 ├── assets/
 │   ├── backgrounds/       Video nền
@@ -71,7 +73,8 @@ Set-Location ..
 ```
 
 Các màn hình: Video thường, Threads, Biên tập Threads, Thư viện media, Video đã xuất, Facebook Reels,
-Kiểm tra hệ thống. Nút Lưu cấu hình lưu bản kịch bản video thường và thông số dùng chung;
+Kiểm tra hệ thống. Lưu thiết lập ghi thông số dùng chung vào `config/settings.json`;
+Lưu kịch bản ghi bản thảo video thường và tên nội dung vào `work/video-draft.json`.
 bản sửa trong phiên được giữ khi chuyển tab. Tải file kịch bản để lưu bản riêng của Threads.
 
 Để phát triển giao diện với Vite: giữ Python API chạy ở cổng 7860, chạy `npm.cmd run dev`
@@ -112,6 +115,9 @@ Meme dùng chung nằm trong `assets/memes/`.
 chỉ dọn khi không còn cần và không có tác vụ sử dụng. Các file `work/fb.env`,
 `work/fb_config.json`, `work/fb_posted.json`, `work/threads_state.json` và glossary
 nếu có là cấu hình, lịch sử hoặc phiên đăng nhập cần giữ lại.
+`work/video-draft.json` là bản thảo video thường cần giữ. App tự chuyển `script` và `content`
+từ cấu hình cũ sang đây mà không xóa bài. `work/cache/` chứa cả voice đã duyệt, nên không
+dọn toàn bộ cache nếu còn muốn xuất lại bằng đúng giọng đã nghe.
 `work/threads-script/sessions/` lưu bản thô, nguồn, curated, TTS, kết quả kiểm tra và bước đang làm
 của từng bài đã scan; đây là dữ liệu dự án cần giữ, không phải cache render.
 

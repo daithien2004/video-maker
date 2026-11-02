@@ -54,7 +54,7 @@ export default function App() {
     try {
       const data = await request('/bootstrap')
       setBoot(data); setSettings(data.settings)
-      setDrafts({ video: newDraft(data.settings.script || '', data.settings.content), threads: newDraft('') })
+      setDrafts({ video: newDraft(data.video_draft?.script || '', data.video_draft?.content || ''), threads: newDraft('') })
     } catch (error) { setBootError(error.message) }
   }, [])
   useEffect(() => { initial() }, [initial])
@@ -76,15 +76,14 @@ export default function App() {
     if (saving) return false
     setSaving(true)
     try {
-      const current = await request('/bootstrap')
-      const script = scope === 'script' ? drafts.video.script : current.settings.script
       const updates = scope === 'script'
         ? { content: drafts.video.content }
         : Object.fromEntries(Object.entries(settings).filter(([key]) =>
           scope === 'threads-layout' ? key.startsWith('threads_') && key !== 'threads_scrape'
             : scope === 'video-layout' ? ['meme_y', 'meme_w', 'meme_h', 'bg', 'font', 'font_size', 'text_color', 'outline_color', 'outline_w', 'text_y', 'emph_color', 'emph_scale', 'max_words', 'pop', 'upper'].includes(key)
               : key !== 'content' && key !== 'script' && !key.startsWith('threads_')))
-      await request('/settings', { script, settings: updates })
+      if (scope === 'script') await request('/video-draft', { script: drafts.video.script, settings: updates })
+      else await request('/settings', { settings: updates })
       notify(scope === 'script' ? 'Đã lưu kịch bản Video thường.' : scope.endsWith('layout') ? 'Đã lưu bố cục.' : 'Đã lưu thiết lập chung.')
       return true
     } catch (error) { notify(error.message, 'error'); return false }

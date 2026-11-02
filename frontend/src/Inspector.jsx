@@ -39,7 +39,7 @@ export default function Inspector({ settings: s, setSettings, voiceCatalog, setV
         {threads ? slider('threads_radius', 'Bo góc card Threads', 0, 80) : null}
         {threads ? slider('threads_side_margin', 'Lề ngang card Threads', 0, 120) : null}
         {threads ? slider('threads_shadow', 'Bóng đổ card Threads', 0, 100) : null}
-        {check('card_motion', 'Card ảnh nở/trôi nhẹ')}{check('mascot', 'Mascot trồi lên ở đoạn mở đầu')}{check('pop_in', 'Card nảy vào khi sang mục (Threads)')}{check('carry', 'Giữ media ở nhịp không có thẻ')}{check('nvenc', 'Mã hóa bằng GPU NVIDIA')}
+        {check('card_motion', 'Card ảnh nở/trôi nhẹ')}{check('mascot', 'Mascot trồi lên ở đoạn mở đầu')}{check('pop_in', 'Card nảy vào khi sang mục (Threads)')}{check('next_card', 'Card kế tiếp chờ mờ bên dưới rồi trượt lên (Threads)')}{check('carry', 'Giữ media ở nhịp không có thẻ')}{check('nvenc', 'Mã hóa bằng GPU NVIDIA')}
       </section>
     </div><div className="modal-footer"><Button onClick={onApply || onClose} variant="primary" icon="check">Áp dụng</Button></div>
   </Modal>
