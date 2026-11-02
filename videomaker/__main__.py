@@ -1,4 +1,7 @@
-"""Khởi động giao diện bằng python -m videomaker."""
+"""Launch the local VideoMaker web UI."""
+
 from .api import main
 
-main()
+
+if __name__ == "__main__":
+    main()

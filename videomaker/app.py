@@ -17,7 +17,7 @@ from . import pipeline as pl
 from . import threads_shot as ts
 from . import fb_post as fb
 from .paths import CONFIG_DIR
-from .settings_store import load_state, save_state, DRAFT_KEYS
+from .settings_store import load_settings as read_settings, save_settings as write_settings
 
 
 class AppError(Exception):
@@ -42,14 +42,14 @@ OPT_KEYS = ["backend", "voice", "speed", "bg", "upper", "font", "font_size", "te
 
 DEFAULTS = {
     "backend": pl.BACKEND_VIENEU, "voice": "", "speed": 1.0, "bg": "ngẫu nhiên",
-    "upper": True, "font": "Segoe UI Black", "font_size": 120, "text_color": "#FF9A1F",
-    "outline_color": "#FFFFFF", "outline_w": 9, "text_y": 1010, "max_words": 4, "pop": True,
-    "meme_y": 210, "meme_w": 960, "meme_h": 560, "carry": True, "use_music": False,
-    "music_vol": 0.08, "nvenc": False, "emph_color": "#FFE600", "emph_scale": 1.3,
-    "script": "", "content": "", "gap": pl.GAP, "threads_radius": 0, "threads_side_margin": 108,
+    "upper": True, "font": "Segoe UI Black", "font_size": 120, "text_color": "#FFFFFF",
+    "outline_color": "#FF9A1F", "outline_w": 9, "text_y": 880, "max_words": 4, "pop": False,
+    "meme_y": 150, "meme_w": 960, "meme_h": 640, "carry": True, "use_music": False,
+    "music_vol": 0.08, "nvenc": False, "emph_color": "#FF9A1F", "emph_scale": 1.4,
+    "content": "", "gap": pl.GAP, "threads_radius": 0, "threads_side_margin": 108,
     "threads_shadow": 0, "threads_padding": 0, "threads_max_height": 640, "threads_zoom": 140,
     "threads_padding_top": -1, "threads_padding_right": -1, "threads_padding_bottom": -1, "threads_padding_left": -1,
-    "card_motion": True, "karaoke": True, "bg_motion": True, "pop_in": True, "sfx": True, "fps": 60, "mascot": True, "next_card": True,
+    "card_motion": True, "karaoke": False, "bg_motion": True, "pop_in": False, "sfx": True, "fps": 60, "mascot": True, "next_card": True,
     "threads_scrape": {"top": 20, "mode": "auto", "ident": "avatar", "nested": True,
                        "reply_depth": 1, "reply_per_parent": 2},
 }
@@ -91,7 +91,7 @@ def _clean(key, value):
     if key == "bg":
         # nền đã bị xóa khỏi thư mục thì quay về ngẫu nhiên
         return value if isinstance(value, str) and value in bg_choices() else None
-    if key in ("voice", "script"):
+    if key == "voice":
         return value if isinstance(value, str) else None
     if key == "font":
         return value if isinstance(value, str) and value.strip() else None
@@ -104,8 +104,7 @@ def load_settings() -> dict:
     """Cấu hình đã lưu; thiếu hoặc hỏng thì dùng mặc định."""
     cfg = dict(DEFAULTS)
     try:
-        saved, draft = load_state(SETTINGS_FILE)
-        raw = {**saved, **draft}
+        raw = read_settings(SETTINGS_FILE)
     except (OSError, ValueError):
         return cfg
     if isinstance(raw, dict):
@@ -125,7 +124,7 @@ def save_settings(**updates) -> str:
                 val = _clean(key, value)
                 if val is not None:
                     cfg[key] = val
-        save_state(SETTINGS_FILE, cfg, {key: cfg[key] for key in updates if key in DRAFT_KEYS})
+        write_settings(SETTINGS_FILE, {key: value for key, value in cfg.items() if key != "script"})
     return str(SETTINGS_FILE)
 
 # --------------------------------------------------------------------------- hàm hỗ trợ
@@ -142,17 +141,17 @@ def make_opts(backend, voice, speed, bg, upper, font, font_size, text_color, out
               threads_radius=0, threads_side_margin=0, threads_shadow=0,
               threads_padding=0, threads_max_height=640, threads_padding_top=-1,
               threads_padding_right=-1, threads_padding_bottom=-1, threads_padding_left=-1, threads_zoom=140,
-              card_motion=True, karaoke=True, bg_motion=True, pop_in=True, sfx=True,
+              card_motion=True, karaoke=False, bg_motion=True, pop_in=True, sfx=True,
               fps=60, mascot=True, next_card=True) -> pl.Options:
     return pl.Options(
         backend=backend, voice=voice or "", speed=float(speed), bg=bg or "ngẫu nhiên",
         content=(content or "").strip(), gap=float(gap),
         upper=bool(upper), font=(font or "Segoe UI Black").strip(), font_size=int(font_size),
-        text_color=text_color or "#FF9A1F", outline_color=outline_color or "#FFFFFF",
+        text_color=text_color or "#FFFFFF", outline_color=outline_color or "#FF9A1F",
         outline_w=int(outline_w), text_y=int(text_y), max_words=int(max_words), pop=bool(pop),
         meme_y=int(meme_y), meme_w=int(meme_w), meme_h=int(meme_h), carry=bool(carry),
         use_music=bool(use_music), music_volume=float(music_vol), nvenc=bool(nvenc),
-        emph_color=emph_color or "#FFE600", emph_scale=float(emph_scale),
+        emph_color=emph_color or "#FF9A1F", emph_scale=float(emph_scale),
         threads_radius=int(threads_radius),
         threads_side_margin=int(threads_side_margin),
         threads_shadow=int(threads_shadow),
@@ -426,7 +425,7 @@ def _fb_video_choices() -> list[tuple[str, str]]:
     """(nhãn, đường dẫn) các video đã xuất trong output/, mới nhất trước."""
     out: list[tuple[str, str]] = []
     try:
-        files = sorted(pl.OUT_DIR.glob("*.mp4"),
+        files = sorted(pl.exported_videos(),
                        key=lambda p: p.stat().st_mtime, reverse=True)
     except OSError:
         files = []
@@ -503,24 +502,105 @@ def _fb_dataset_for(video: str) -> Path | None:
             best = (m, f)
     return best[1] if best else None
 
+def _fb_script_for(video: str) -> Path | None:
+    """Tìm kịch bản video thường theo sidecar hoặc tên content trong output."""
+    p = Path(video)
+    candidates: list[str] = []
+    meta = p.with_suffix(".json")
+    if meta.is_file():
+        try:
+            content = (json.loads(meta.read_text(encoding="utf-8")) or {}).get("content") or ""
+            if content:
+                candidates.append(str(content))
+        except (OSError, ValueError, AttributeError):
+            pass
+    stem = p.stem
+    if stem.startswith("video_"):
+        candidates.append(stem[6:].rsplit("_", 1)[0])
+    for content in candidates:
+        script = pl.ILLUS_DIR / content / "kich-ban.txt"
+        if script.is_file():
+            return script
+    return None
+
 def _fb_caption_for(video: str, tags: str = "", fallback: str = "") -> tuple[str, str]:
     """(caption, nguồn) cho một video: ưu tiên caption chung, không thì soạn từ bài gốc."""
     if (fallback or "").strip():
         return fallback.strip(), "caption chung"
-    src = _fb_dataset_for(video)
+    src = _fb_script_for(video) or _fb_dataset_for(video)
     if src is None:
         return "", "—"
     try:
-        data = json.loads(src.read_text(encoding="utf-8"))
+        if src.name == "kich-ban.txt":
+            data = {"post": {"text": src.read_text(encoding="utf-8")}, "comments": []}
+        else:
+            data = json.loads(src.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return "", "—"
     post = data.get("post") or {}
     extra = [(c.get("text") or "") for c in (data.get("comments") or [])[:3]]
-    name = src.parent.parent.name
+    name = src.parent.parent.name if src.name == "threads.json" else src.parent.name
     opts = cap.make_options(post.get("text") or "", name, tags, extra)
     if not opts:
         return "", "—"
     return opts[0]["caption"], name
+
+def on_fb_auto_kienthuc(progress=_noop_progress):
+    """Đăng video đầu ngay, rồi hẹn các video sau mỗi ngày lúc 11:30."""
+    page, token, version = _fb_creds("", "", "")
+    if not page or not token:
+        raise AppError("Chưa có Page ID/token.\n\n" + _fb_env_note())
+    root = pl.OUT_DIR / "kienthuc"
+    posted = fb.posted_log()
+    all_videos = sorted(
+        (p for p in root.glob("*.mp4") if p.is_file()),
+        key=lambda p: (p.stat().st_mtime, p.name))
+    if not all_videos:
+        raise AppError("Không còn video kienthuc chưa đăng hoặc chưa hẹn.")
+    ready = []
+    tomorrow = (datetime.now() + timedelta(days=1)).replace(
+        hour=11, minute=30, second=0, microsecond=0)
+    for index, video in enumerate(all_videos):
+        if video.name in posted:
+            continue
+        if index == 0:
+            when = None
+        elif index <= 2:
+            when = tomorrow
+        else:
+            when = tomorrow + timedelta(days=index - 1)
+        caption, source = _fb_caption_for(str(video))
+        if not caption:
+            raise AppError(f"{video.name}: không tìm được kịch bản để tạo caption.")
+        ready.append((video, when, caption, source))
+    if not ready:
+        raise AppError("Các video kienthuc hiện có đều đã đăng hoặc đã hẹn.")
+    try:
+        info = fb.check(page, token, version)
+    except fb.FbError as e:
+        raise AppError(str(e)) from e
+    cfg = fb.load_config()
+    done: list[str] = []
+    fails: list[tuple[str, str]] = []
+    for index, (video, when, caption, _source) in enumerate(ready):
+        progress(0.05 + 0.9 * index / len(ready),
+                 desc=(f"Đang đăng {video.name}…"
+                       if when is None else f"Đang hẹn {video.name} — {when:%d/%m %H:%M}…"))
+        try:
+            res = fb.upload_reel(page, token, video, caption, when, version, cfg)
+            fb.mark_posted(str(video), res.get("id", ""), when)
+            done.append(("ngay" if when is None else f"{when:%d/%m %H:%M}")
+                         + f" · `{video.name}`")
+        except fb.FbError as e:
+            fails.append((video.name, str(e)))
+    msg = f"✅ Đã xử lý **{len(done)}/{len(ready)}** Reel trên **{info.get('name')}**."
+    if done:
+        msg += "\n\n" + "\n".join(f"- {item}" for item in done)
+    if fails:
+        msg += "\n\n❌ Không hẹn được:\n\n" + "\n".join(
+            f"- `{name}`: {error}" for name, error in fails)
+    msg += "\n\nCaption dùng phương án 1: ngắn gọn, đi thẳng vào ý."
+    return msg
 
 def on_fb_edit_rows(videos, pattern, current, reset_times=False, shared=None, tags=""):
     """Mỗi video một hàng; giữ bản sửa khi thêm/bỏ video khỏi danh sách.
@@ -625,15 +705,23 @@ def on_fb_batch_schedule(videos, pattern, caption, tags, edits=None, progress=_n
             on_fb_edit_rows(remaining, pattern, edits, tags=tags))
 
 def _fb_sources() -> list[tuple[str, str]]:
-    """(nhãn, đường dẫn `threads.json`) của các bài Threads đã cào, mới nhất trước."""
+    """Caption sources from scanned Threads posts and prepared regular scripts."""
     out: list[tuple[str, str]] = []
     try:
-        files = sorted(pl.ILLUS_DIR.glob("*/post/threads.json"),
+        files = sorted(
+            [*pl.ILLUS_DIR.glob("*/post/threads.json"),
+             *pl.ILLUS_DIR.glob("*/kich-ban.txt")],
                        key=lambda p: p.stat().st_mtime, reverse=True)
     except OSError:
         files = []
     for f in files:
         try:
+            if f.name == "kich-ban.txt":
+                text = f.read_text(encoding="utf-8").strip()
+                if not text:
+                    continue
+                out.append((f"{f.parent.name} · video thường", str(f)))
+                continue
             data = json.loads(f.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
@@ -646,7 +734,7 @@ def _fb_sources() -> list[tuple[str, str]]:
     return out
 
 def _fb_read(src: str | None) -> tuple[dict, Path]:
-    """Đọc threads.json của bài đã chọn (rỗng = bài mới nhất)."""
+    """Read the selected Threads source or regular-video script."""
     path = Path(src) if src else None
     if path is None or not path.is_file():
         rows = _fb_sources()
@@ -655,6 +743,8 @@ def _fb_read(src: str | None) -> tuple[dict, Path]:
                            "Threads trước.")
         path = Path(rows[0][1])
     try:
+        if path.name == "kich-ban.txt":
+            return {'post': {'text': path.read_text(encoding='utf-8')}, 'comments': []}, path
         return json.loads(path.read_text(encoding="utf-8")), path
     except (OSError, ValueError) as e:
         raise AppError(f"Không đọc được dữ liệu bài Threads: {e}") from e
@@ -664,7 +754,8 @@ def on_fb_gen(src, tags, topic="Tự nhận diện"):
     data, path = _fb_read(src)
     post = data.get("post") or {}
     extra = [(c.get("text") or "") for c in (data.get("comments") or [])[:3]]
-    opts = cap.make_options(post.get("text") or "", path.parent.parent.name, tags, extra, topic)
+    content = path.parent.parent.name if path.name == "threads.json" else path.parent.name
+    opts = cap.make_options(post.get("text") or "", content, tags, extra, topic)
     if not opts:
         raise AppError("Bài này không có chữ nào để viết caption.")
     titles = [o["title"] for o in opts]
@@ -842,4 +933,3 @@ def on_check():
         lines.append(f"❌ vieneu: {e}")
     lines.append(f"ℹ️ Thư mục app: {pl.APP_DIR}")
     return "\n".join(lines)
-

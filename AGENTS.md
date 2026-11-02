@@ -4,20 +4,19 @@
 
 - `videomaker/`: mã nguồn Python; dùng import theo package `videomaker`.
 - `frontend/`: giao diện React/Vite; `src/` là mã nguồn, `dist/` là bản build Python phục vụ.
-- `config/settings.json`: chỉ cấu hình giao diện/dựng video; kịch bản video thường và tên nội dung nằm trong `work/video-draft.json`.
+- `config/settings.json`: chỉ cấu hình dựng video; kịch bản video thường và tên nội dung nằm trong file kịch bản tại `assets/illus/<nội-dung>/`.
 - `docs/`: hướng dẫn sử dụng và sơ đồ thư mục.
 - `tests/`: bài kiểm thử; `tools/`: công cụ phát triển.
 - `assets/`: thư viện nền, ảnh, meme, font và nhạc; `output/`: video hoàn chỉnh.
 - `work/`: dữ liệu tạm và trạng thái đăng nhập/đăng bài. Không xóa toàn bộ thư mục này khi dọn cache.
-- Giữ `work/video-draft.json`, cache voice đã duyệt và checkpoint Threads khi dọn file render cũ.
+- Giữ cache voice đã duyệt và checkpoint Threads khi dọn file render cũ.
 - `skills/`: các flow cho AI; `ffmpeg/` và `.venv/`: công cụ và môi trường chạy.
 
-Chạy app bằng `run.bat` hoặc `.venv\Scripts\python.exe -m videomaker` từ thư mục gốc.
-App mặc định dùng giao diện React tại `http://127.0.0.1:7860`, backend là FastAPI.
-Sau khi sửa React, chạy `npm.cmd run build` trong `frontend/`, hoặc dùng `run_dev.bat` để tự build lại.
-Không đưa token Facebook vào frontend, localStorage hoặc phản hồi API. Media được phục vụ qua `/api/media`.
+Chạy dựng video bằng `python tools/render_script.py <kich-ban.txt> [--content <ten>] [--preview]`.
+Giao diện React local vẫn dùng để xem/chỉnh sửa và thao tác trực tiếp; dựng kịch bản/video
+cũng có thể thực hiện qua agent/CLI. Media nằm trong `assets/` và `output/`.
 Chạy kiểm thử bằng `.venv\Scripts\python.exe -m unittest discover -s tests -v`.
-Xem [sơ đồ và cách dùng](docs/CAU_TRUC.md) khi cần tìm file.
+Cấu trúc tối giản: `assets/`, `output/`, `work/`, `config/`, `skills/`, `tools/`, `videomaker/`, `tests/`.
 
 ## Video thường (không phải Threads)
 

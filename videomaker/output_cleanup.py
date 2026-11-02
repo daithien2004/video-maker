@@ -1,4 +1,4 @@
-"""Only remove an exported video and the same-name files that sit beside it in output/."""
+"""Remove an exported video and same-name sidecars anywhere under output/."""
 import time
 from pathlib import Path
 
@@ -6,14 +6,15 @@ from pathlib import Path
 def related_files(video, output_dir):
     """Video MP4 trong output/ + các file cùng tên nằm cạnh nó (metadata, phụ đề, ảnh bìa)."""
     video, output_dir = Path(video), Path(output_dir).resolve()
-    if video.is_symlink() or video.resolve().parent != output_dir or video.suffix.lower() != '.mp4':
+    resolved = video.resolve()
+    if video.is_symlink() or output_dir not in resolved.parents or video.suffix.lower() != '.mp4':
         raise ValueError('Chỉ được xóa video MP4 trong output.')
     if not video.is_file():
         raise ValueError('Video không còn tồn tại.')
     files = [video.resolve()]
     for suffix in ('.json', '.srt', '.ass', '.vtt', '.jpg', '.jpeg', '.png', '.webp'):
         sidecar = video.with_suffix(suffix)
-        if sidecar.is_file() and not sidecar.is_symlink() and sidecar.resolve().parent == output_dir:
+        if sidecar.is_file() and not sidecar.is_symlink() and sidecar.resolve().parent == resolved.parent:
             files.append(sidecar.resolve())
     return files
 

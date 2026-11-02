@@ -370,32 +370,22 @@ def create_app() -> FastAPI:
         config = fb.load_config()
         cfg = actions.load_settings()
         return {'api_revision': 6,
-                'settings': {key: value for key, value in cfg.items() if key not in actions.DRAFT_KEYS},
-                'video_draft': {key: cfg[key] for key in actions.DRAFT_KEYS},
-                'defaults': {key: value for key, value in actions.DEFAULTS.items() if key not in actions.DRAFT_KEYS},
+                'settings': cfg,
+                'defaults': actions.DEFAULTS,
                 'backgrounds': actions.bg_choices(), 'contents': pl.list_contents(),
                 'threads_status': ts.session_status().replace('**', ''),
                 'facebook': {'page': config.get('page_id', ''), 'version': config.get('version', fb.DEFAULT_VERSION),
                              'tags': config.get('hashtags', ''), 'configured': bool(config.get('page_id') and config.get('token')),
                              'note': actions._fb_env_note(), 'suggested_time': actions._fb_suggest_time()},
                 'counts': {'memes': sum(map(len, pl.scan_memes().values())),
-                           'contents': len(pl.list_contents()), 'videos': len(list(pl.OUT_DIR.glob('*.mp4')))}}
+                           'contents': len(pl.list_contents()), 'videos': len(pl.exported_videos())}}
 
     @api.post('/api/settings')
     def save_settings(body: Draft):
         cfg = settings_with(body.settings)
         updates = {key: cfg[key] for key in body.settings if key in actions.DEFAULTS}
-        # Compatibility for older clients that explicitly submit a draft with settings.
-        if 'script' in body.model_fields_set:
-            updates['script'] = body.script
         actions.save_settings(**updates)
         return {'message': 'Đã lưu cấu hình.'}
-
-    @api.post('/api/video-draft')
-    def save_video_draft(body: Draft):
-        cfg = settings_with(body.settings)
-        actions.save_settings(script=body.script, content=cfg['content'])
-        return {'message': 'Đã lưu kịch bản Video thường.'}
 
     @api.post('/api/analyze')
     def analyze(body: Draft):
@@ -591,7 +581,7 @@ def create_app() -> FastAPI:
     def outputs():
         posted = fb.posted_log()
         return {'items': [dict(posted=bool(posted.get(p.name)), poster=poster_url(p), **file_info(p))
-                          for p in sorted(pl.OUT_DIR.glob('*.mp4'), key=lambda p: p.stat().st_mtime, reverse=True)]}
+                          for p in sorted(pl.exported_videos(), key=lambda p: p.stat().st_mtime, reverse=True)]}
 
     @api.get('/api/media/thumb')
     def media_thumb(path: str):
@@ -834,6 +824,9 @@ def create_app() -> FastAPI:
 
     @api.post('/api/facebook/{action}')
     def facebook(action: str, body: FacebookRequest):
+        if action == 'auto-kienthuc':
+            return jobs.submit('facebook-auto-kienthuc',
+                               lambda progress: {'message': actions.on_fb_auto_kienthuc(progress)})
         if action == 'save':
             return {'message': actions.on_fb_save(body.page, body.token, body.version, body.tags)}
         if action == 'check':
@@ -847,14 +840,17 @@ def create_app() -> FastAPI:
             if not body.source:
                 raise HTTPException(400, 'Chọn bài Threads làm nguồn caption.')
             source = (APP_DIR / body.source).resolve()
-            if pl.ILLUS_DIR.resolve() not in source.parents or source.name != 'threads.json' or not source.is_file():
+            if (pl.ILLUS_DIR.resolve() not in source.parents
+                    or source.name not in {'threads.json', 'kich-ban.txt'}
+                    or not source.is_file()):
                 raise HTTPException(400, 'Nguồn caption không hợp lệ.')
             result = actions.on_fb_gen(str(source), body.tags, body.topic)
             return {'options': result[0]}
         if action in ('schedule', 'batch-plan', 'batch'):
             videos = body.videos if action != 'schedule' else [body.video]
             resolved = [media_path(v) for v in videos]
-            if not resolved or any(p.suffix.lower() != '.mp4' or p.parent != pl.OUT_DIR.resolve() for p in resolved):
+            output_root = pl.OUT_DIR.resolve()
+            if not resolved or any(p.suffix.lower() != '.mp4' or output_root not in p.resolve().parents for p in resolved):
                 raise HTTPException(400, 'Chọn video MP4 đã xuất trong output.')
             videos = list(map(str, resolved))
             if action == 'batch-plan':
@@ -897,3 +893,7 @@ def main():
     if not os.environ.get('VIDEOMAKER_NO_BROWSER'):
         threading.Timer(1.5, lambda: webbrowser.open(f'http://127.0.0.1:{port}')).start()
     uvicorn.run(create_app(), host='127.0.0.1', port=port, log_level='info')
+
+
+if __name__ == '__main__':
+    main()

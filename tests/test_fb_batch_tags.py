@@ -22,11 +22,17 @@ class FbBatchTagsTests(unittest.TestCase):
     def test_draft_caption_includes_shared_hashtags(self):
         rows = self._rows()
         self.assertEqual(len(rows[0]), 3)
-        self.assertTrue(rows[0][2].endswith("#fyp #xuhuong #funny #test"))
+        self.assertTrue(rows[0][2].endswith(
+            "#kienthuc #kienthucbonich #hocmoingay #chiase "
+            "#dieuthuvi #reels #xuhuong #fyp #test"))
 
     def test_shared_caption_also_gets_the_tags(self):
         rows = self._rows(shared="Caption chung viết tay")
-        self.assertEqual(rows[0][2], "Caption chung viết tay\n\n#fyp #xuhuong #funny #test")
+        self.assertEqual(
+            rows[0][2],
+            "Caption chung viết tay\n\n"
+            "#kienthuc #kienthucbonich #hocmoingay #chiase "
+            "#dieuthuvi #reels #xuhuong #fyp #test")
 
     def test_rebuilding_rows_does_not_duplicate_tags(self):
         once = self._rows()

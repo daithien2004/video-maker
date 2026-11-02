@@ -424,12 +424,12 @@ def parse_when(text: str) -> datetime:
     raise FbError("Không đọc được thời gian. Ghi kiểu `28/10/2026 20:00`.")
 
 
-def normalize_tags(tags: str, limit: int = 5) -> str:
-    """Giữ ba tag cố định theo yêu cầu; lọc trùng/rác và giới hạn tag bổ sung."""
+def normalize_tags(tags: str, limit: int = 9) -> str:
+    """Giữ bộ tag mặc định; lọc trùng/rác và giới hạn tag bổ sung."""
     return " ".join("#" + t for t in keep_tags(tags, limit))
 
 
-def keep_tags(tags: str, limit: int = 5) -> list[str]:
+def keep_tags(tags: str, limit: int = 9) -> list[str]:
     """Ưu tiên hashtag cố định, sau đó các tag bổ sung hợp lệ."""
     from .caption import FIXED_TAGS, GENERIC_TAGS
 

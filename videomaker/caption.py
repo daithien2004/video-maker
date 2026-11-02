@@ -1,7 +1,7 @@
 """Sinh caption Facebook Reels theo skill `facebook-reels-caption` (không cần mạng/LLM).
 
 Skill quy định: hook ≤ ~125 ký tự đứng một mình vẫn hiểu, thân ngắn 2–5 dòng, đúng
-một CTA, 0–5 hashtag cụ thể (tránh #viral #reels #xuhuong…), kèm 1–2 dòng chữ overlay.
+một CTA, hashtag theo bộ mặc định của dự án, kèm 1–2 dòng chữ overlay.
 
 Ở đây chỉ dùng lại chính chữ trong bài gốc — không bịa số liệu, giá, cam kết. Ba phương
 án khác nhau ở cách mở đầu và CTA, đúng định dạng đầu ra của skill.
@@ -12,8 +12,9 @@ import re
 import unicodedata
 
 HOOK_LIMIT = 125
-MAX_TAGS = 5
-FIXED_TAGS = ("fyp", "xuhuong", "funny")
+MAX_TAGS = 9
+FIXED_TAGS = ("kienthuc", "kienthucbonich", "hocmoingay", "chiase",
+              "dieuthuvi", "reels", "xuhuong", "fyp")
 
 # Hashtag chung chung: skill khuyên bỏ, chỉ giữ tag cụ thể của ngách/nội dung.
 GENERIC_TAGS = {
@@ -182,7 +183,8 @@ def make_options(text: str, content: str = "", tags: str = "",
     vẫn chỉ dùng chữ có thật trong video, không bịa.
     """
     def clean(value):
-        return re.sub(r"#\w+", "", value or "").strip()
+        value = re.sub(r"(?m)^\s*\[[^\]\r\n]+\]\s*", "", value or "")
+        return re.sub(r"#\w+", "", value).strip()
 
     main = units(clean(text))
     alts = [u for u in units(clean("\n".join(extra or []))) if u not in main]

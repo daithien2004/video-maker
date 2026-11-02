@@ -10,9 +10,12 @@ và **tải sẵn minh hoạ** vào `assets/illus/<nội-dung>/<tag>/` (minh h�
 
 ## Flow video thường đã chốt
 
-- Người dùng cung cấp kịch bản thô. Biên tập thành lời kể tự nhiên theo giọng **chia sẻ, cập nhật thông tin**, giữ ý chính, tên riêng và số liệu; không tự thêm tình tiết hoặc số liệu chưa được kiểm chứng. Nếu người dùng yêu cầu giữ nguyên văn hoặc đưa bản đã duyệt để chỉ định dạng, giữ nguyên lời văn đó.
+- Người dùng cung cấp kịch bản thô. Biên tập thành lời kể tự nhiên theo giọng **chia sẻ, cập nhật thông tin**, giữ ý chính, tên riêng và số liệu; không tự thêm tình tiết, số liệu, nguyên nhân, động cơ, kết quả hoặc quan hệ nhân–quả nếu đầu vào/nguồn không nêu hoặc không chứng minh được. Câu nối chỉ được làm rõ trật tự và quan hệ đã có trong dữ kiện, không được dùng để lấp chỗ thiếu bằng suy đoán. Nếu dữ kiện chưa đủ, nói rõ chỗ chưa xác định hoặc giữ cách diễn đạt thận trọng. Nếu người dùng yêu cầu giữ nguyên văn hoặc đưa bản đã duyệt để chỉ định dạng, giữ nguyên lời văn đó.
 - Chia bản đã biên tập thành nhịp và chuyển sang format `[tag] lời đọc || CHỮ HIỂN THỊ CÓ *NHẤN MẠNH*`. Chữ hiển thị phải khớp lời đọc sau biên tập theo mục 4.
 - Tự tìm và chuẩn bị ảnh minh họa: tải file có sẵn hoặc dùng Playwright chụp vùng ảnh/trang liên quan. Mở file kiểm tra đúng chủ thể, đủ rõ và không dính giao diện thừa; lưu theo chủ đề và ghi nguồn theo mục 6. Kết hợp meme từ thư viện phù hợp với từng nhịp.
+- **Chủ đề thương vong/tang tóc/tai nạn chết người (bão lụt, thiên tai, chiến tranh, hỏa hoạn…): không dùng meme và tắt mascot khi dựng.** Dùng ảnh thật/tư liệu cho toàn bộ nhịp, kể cả nhịp phản ứng hay con số gây choáng. Nếu thiếu ảnh thật thì tìm thêm tư liệu, không lấp bằng meme.
+- **Mở và kết video thường bằng cùng một ảnh (bookend)**: ảnh của nhịp đầu và nhịp cuối phải là cùng một file (cùng nội dung), để người xem thấy câu chuyện khép vòng. Đây là ngoại lệ duy nhất của quy tắc "mỗi ảnh chỉ xuất hiện 1 lần"; chọn ảnh đủ khái quát để dùng được cho cả mở lẫn kết (tượng đài, chân dung, toàn cảnh sự kiện), và câu kết phải nhắc đúng thứ ảnh thể hiện.
+- **Kết bài luôn đủ 2 nhịp, không dừng ở thiệt hại:** một nhịp nêu bài học/ý nghĩa, một nhịp khép bằng hình ảnh hồi sinh hoặc hiện tại (dựng lại nhà, người dân trở lại, tưởng niệm). Câu khép phải đóng lại ý đã mở ở hook, không chỉ tả một vật thể rồi dừng. Kết ở con số thiệt hại cuối cùng bị coi là cụt. Không thêm câu chào kết kiểu "cảm ơn đã xem"; video kết ngay sau nhịp khép.
 - Lưu kịch bản UTF-8 tại `assets/illus/<nội-dung>/kich-ban.txt` và lưu sẵn toàn bộ media trước khi bàn giao. Gửi kịch bản để người dùng kiểm tra cùng bảng ánh xạ nhịp → tag → file, nguồn và đường dẫn thư mục. Phân biệt rõ phần đã hoàn tất và media còn thiếu.
 - **Dừng ở bàn giao kịch bản và media để người dùng duyệt rồi tự làm tiếp trong app.** Không tự chạy TTS, render preview, xuất video hoặc đăng bài. Người dùng duyệt kịch bản không tự động đồng nghĩa với yêu cầu render; chỉ thực hiện khi được yêu cầu.
 - Flow này dành cho video thường. Bài/comment Threads làm trong giao diện **Biên tập Threads** của app.
@@ -24,6 +27,11 @@ và **tải sẵn minh hoạ** vào `assets/illus/<nội-dung>/<tag>/` (minh h�
 - Một đoạn văn liền mạch (có thể có số liệu, tên người, mốc thời gian).
 - Tuỳ chọn: giọng điệu (nghiêm túc / hài), độ dài mong muốn, ghi chú "chỗ này phải có hình X".
 - **Mặc định biên tập kịch bản thô theo flow video thường đã chốt ở trên.** Giữ ý chính và thông tin thực tế; không tự rút bỏ ý quan trọng để ép thời lượng. Với yêu cầu giữ nguyên văn hoặc bản đã duyệt chỉ cần định dạng, chỉ chia nhịp, thêm tag và chuẩn hóa số/dấu câu cho TTS. Chữ hiển thị luôn khớp đầy đủ lời đọc cuối cùng.
+- **Tên riêng phải đọc được bằng TTS**: nếu tên nước ngoài, thuật ngữ hoặc từ viết tắt
+  khiến giọng đọc phát âm sai hoặc đánh vần máy móc, chỉ phiên âm trong phần lời đọc
+  bên trái `||`; phần chữ hiển thị bên phải giữ nguyên tên gốc để người xem nhận diện.
+  Vẫn giữ tên gốc trong nguồn, bảng minh họa và ghi chú nội bộ khi cần. Ví dụ:
+  lời đọc `MÉT-SEN-GIƠ` nhưng chữ hiển thị `MESSENGER`.
 
 ## 2. Đầu ra (luôn đúng 3 phần)
 
@@ -47,11 +55,31 @@ Kèm dòng cuối: đã tải về thư mục nào, còn thiếu gì.
 - Cắt ở chỗ có dấu phẩy/chấm là tốt nhất — app cũng ngắt cụm chữ theo dấu câu nên nhịp và chữ khớp nhau.
 - **Khoảng nghỉ giữa nhịp do app tự tính theo dấu câu cuối nhịp**: kết thúc bằng chấm/!/? nghỉ
   dài (~0.5s tổng), kết thúc bằng phẩy/chấm phẩy nghỉ ngắn hơn (~0.3s), cắt giữa cụm không dấu
-  nghỉ ngắn nhất (~0.18s). Không cần chèn lệnh nghỉ; muốn khoảng lặng kịch tính ở chỗ nào thì
+  nghỉ ngắn nhất (~0.15s). Không cần chèn lệnh nghỉ; muốn khoảng lặng kịch tính ở chỗ nào thì
   kết thúc nhịp đó bằng dấu chấm. Luật này áp dụng cho cả flow Threads.
 - **Không tách số khỏi danh từ**: "năm 1932", "20.000 con emu", "9.860 viên đạn" luôn nằm trong một nhịp.
 - Mỗi nhịp **một ý**. Nếu một câu có 2 ý (người + hành động) thì tách thành 2 nhịp — mỗi nhịp sẽ có hình riêng.
 - Đoạn chuyển ý lớn (địa điểm, thời gian, nhân vật mới) luôn bắt đầu nhịp mới.
+- **Không chia nhịp làm gãy một ý trọn vẹn**: một cụm nguyên nhân–cơ chế–kết quả có thể
+  gồm nhiều nhịp, nhưng phải đọc liền vẫn hiểu được quan hệ giữa chúng. Nếu cần đổi chủ
+  đề, thêm một nhịp cầu nêu kết quả hoặc lý do chuyển sang chủ đề mới.
+- **Độ dài video thường: 16–18 nhịp** (mỗi nhịp một ảnh riêng), tương đương video mẫu. Không rút xuống 10 nhịp; thiếu ý thì tách nhịp theo mệnh đề, không gộp. Chỉ ngắn hơn khi nguồn thật sự hết nội dung.
+- **Kể đủ vòng câu chuyện**: mở bằng hook, thân bài trả lời hook từng bước, kết bằng nhịp ý nghĩa + nhịp khép có ảnh. Không bỏ lửng chi tiết đã mở ở hook.
+- **Bảo đảm mạch triển khai, không chỉ đúng từng câu**: mỗi ý quan trọng phải làm rõ
+  chuyện gì xảy ra, vì sao hoặc bằng cách nào, rồi dẫn đến kết quả/ý nghĩa gì phù hợp với
+  mạch chung. Khi chuyển từ ý này sang ý khác, giữ nguyên các quan hệ trước–sau,
+  nguyên nhân–kết quả và vấn đề–cách giải quyết; không xếp các câu đúng riêng lẻ nhưng
+  khiến người nghe phải tự đoán bước nối.
+- **Kiểm tra "vậy thì sao?" sau mỗi cụm ý**: nếu một câu chỉ nêu nguyên nhân, cơ chế,
+  ví dụ, phép so sánh, con số hoặc sự kiện mà chưa cho biết tác dụng, hệ quả hoặc bước
+  tiếp theo, phải bổ sung câu nối hoặc viết lại. Ví von chỉ giúp hình dung, không thay
+  thế lời giải thích nghĩa đen. Mỗi đoạn cần có một điểm đến thông tin rõ ràng trước khi
+  chuyển sang đoạn kế tiếp.
+- **Kiểm tra tham chiếu trước khi giao**: các từ như “này”, “đó”, “nó”, “lần nữa”,
+  “như vậy”, “sau đó” và các cụm xác định như “đường bay này”, “kết quả đó” chỉ được
+  dùng khi đối tượng hoặc sự kiện đã được giới thiệu rõ ở trước và không bị nhầm với
+  chủ thể khác. Nếu chưa có tiền đề, phải gọi tên đối tượng hoặc thêm câu giới thiệu
+  trước; không dùng đại từ để tạo cảm giác liên kết giả.
 
 ## 4. Chữ hiển thị (`||`) và nhấn mạnh
 
@@ -62,14 +90,18 @@ Kèm dòng cuối: đã tải về thư mục nào, còn thiếu gì.
 - Số liệu, số lượng, ngày tháng, năm, tỉ lệ: chuyển phần số viết bằng chữ sang chữ số, giữ đúng giá trị và giữ nguyên các từ xung quanh.
   Ví dụ: "năm một nghìn chín trăm ba mươi hai" → "NĂM *1932*";
   "mười nghìn viên đạn" → "*10.000 VIÊN ĐẠN*";
-  "năm mươi ki lô mét trên giờ" → "*50 KI LÔ MÉT TRÊN GIỜ*".
-  Không tự đổi "ki lô mét trên giờ" thành "KM/H", "phần trăm" thành "%", hoặc viết tắt đơn vị/từ ngữ khác.
+   "năm mươi ki lô mét trên giờ" → lời đọc "*50 KI LÔ MÉT TRÊN GIỜ*", chữ hiển thị có thể viết tắt "*50 KM/H*" nếu muốn gọn.
+   Lời đọc giữ dạng đầy đủ để TTS đọc đúng; chữ hiển thị có thể dùng dạng viết tắt thông dụng (KM/H, %, …) theo ý người dùng, không bắt buộc.
   Giữ nguyên số đã ở dạng chữ số. Chỉ chuyển từ thực sự mang nghĩa số: "năm nay", "một lần nữa", "một đàn chim" không tự đổi thành "5 NAY", "1 LẦN NỮA", "1 ĐÀN CHIM".
 - **Mỗi nhịp bắt buộc có ít nhất 1 cụm `*NHẤN MẠNH*` trong chữ hiển thị**, thường chọn 1–2 cụm trọng tâm.
   Ưu tiên con số → tên riêng → từ/cụm từ mang ý chính hoặc gây sốc. Nhịp không có số vẫn phải nhấn mạnh từ/cụm từ có sẵn trong lời đọc.
   Chỉ bọc dấu `*` quanh chữ có sẵn, không thêm hoặc sửa chữ để tạo điểm nhấn; không bọc toàn bộ câu dài.
 - **Mọi con số quan trọng phải được `*nhấn mạnh*`**: 20.000, 9.860, 284.000, 986… Nếu có nhiều số quan trọng trong cùng nhịp, nhấn mạnh đủ các số đó.
+- **App hiện chữ theo 2 bậc như clip mẫu**: chữ thường hiện trước ở bậc nhỏ (nền trắng, viền cam); phần bọc `*nhấn mạnh*` hiện sau — đúng lúc từ đó được đọc, thường cách dòng nhỏ khoảng 0.3–0.8 giây — ở bậc lớn (nền cam, viền trắng) và xếp bên dưới dòng nhỏ, cả hai cùng giữ tới hết cụm. App không cắt giữa một cụm `*nhấn mạnh*` khi chia cụm, nên bọc trọn cụm nghĩa (MIỀN NAM, DỰNG LẠI, 3 THÁNG 11, 105 KI LÔ MÉT TRÊN GIỜ) để cụm không bị chẻ đôi. App tự bỏ dấu câu ở cuối cụm khi hiển thị (dấu vẫn giữ trong lời đọc), nên không cần viết khác cho phần `||`.
+- **Cách chia cụm hiển thị (đơn giản hóa)**: mỗi nhịp được chia thành các **cụm ngắn 2–4 từ**, cách nhau bằng dấu phẩy; mỗi cụm là **một lần hiển thị trên một dòng**. Mỗi cụm phải **đủ nghĩa độc lập**, không được mượn/chép từ của cụm khác để đủ số từ. **Lời đọc** (trước `||`) giữ nguyên câu đầy đủ để TTS đọc liên tục; **chữ hiển thị** (sau `||`) dùng dấu phẩy để tách cụm và có thể dùng dạng viết tắt (KM/H, %, 2/11, …) cho gọn. Hai bên không cần khớp từ từng chữ. Từ/cụm nhấn mạnh bọc `*...*` và được tô kiểu riêng ngay tại chỗ (không xếp chồng, không tách theo thời gian). Ví dụ: `Ngày 12/4/1961, *Yuri Gagarin*, ngồi trong tàu, *Vostok 1*, ...`. Không để trống clip để tái dùng ảnh giữa các nhịp.
 - Ưu tiên dấu câu `, . ! ?`. Nếu bản gốc có `—`, `–`, `:`, `-` làm dấu ngắt câu, có thể thay bằng dấu phẩy/chấm ở cả lời đọc và chữ hiển thị để tránh app tách cụm kỳ lạ; không đổi từ hoặc ý. Giữ ký hiệu thuộc tên riêng, số âm hoặc khoảng số khi thay sẽ làm sai nghĩa.
+- **Cách gọi con vật**: dùng tên riêng, "nó" hoặc "chú chó/chú mèo…". Không dùng đại từ chỉ người ("cô", "anh", "chị", "ông") cho con vật vì nghe như đang nói về người. Nếu câu đã nêu tên thì các câu sau dùng "nó", tránh lặp tên quá nhiều.
+- **Bố cục khung hình video thường**: ảnh neo đáy tại một đường cố định (`meme_y=150`, `meme_h=640` → đáy y≈750), chữ căn giữa tại `text_y=880`; khoảng cách đáy ảnh → đỉnh chữ khoảng 20px, không đè lên nhau. Chữ luôn nằm trên một trục ngang dù cụm chữ to hay nhỏ. Ảnh cách mỗi mép ngang tối thiểu 60px (`meme_w ≤ 960`).
 
 ## 5. Tag và thư viện minh hoạ
 
@@ -82,12 +114,14 @@ Kèm dòng cuối: đã tải về thư mục nào, còn thiếu gì.
 - Nếu một nhịp có nhiều chủ thể cần ảnh riêng, chia nhịp tại ranh giới cụm nghĩa và gán tag cụ thể cho từng phần; giữ nguyên toàn bộ lời đọc và chữ hiển thị. Nếu không thể chia hợp lý, tìm một ảnh/sơ đồ có sẵn bao quát các chủ thể đó.
 
 - Tên tag **không dấu, gạch nối**: `pearce`, `meredith`, `sung-lewis`, `dan-emu`, `lua-mi`, `ban-do`, `so-lieu-986`.
-- **Mỗi ảnh chỉ được xuất hiện 1 lần trong toàn bộ video**, kể cả các nhịp cách xa nhau. Với chủ thể được nhắc lại, tìm ảnh khác đúng chủ thể; không dùng lại cùng ảnh dưới tên file, kích thước hoặc bản cắt khác.
+- **Mỗi ảnh chỉ được xuất hiện 1 lần trong toàn bộ video**, kể cả các nhịp cách xa nhau — trừ ảnh bookend ở nhịp mở và nhịp kết (xem mục "Flow video thường đã chốt"). Với chủ thể được nhắc lại, tìm ảnh khác đúng chủ thể; không dùng lại cùng ảnh dưới tên file, kích thước hoặc bản cắt khác.
+- **Mỗi nhịp bắt buộc có ảnh riêng** (1 hình / 1 nhịp). Không để trống clip hay dùng `carry` để lặp ảnh qua nhiều nhịp chỉ nhằm tiết kiệm. Mục tiêu 16–18 nhịp → 16–18 ảnh khác nhau (ngoại trừ bookend mở/kết).
 - **Mỗi meme tối đa 2 lần trong toàn bộ video**, không dùng cùng meme ở hai nhịp liền nhau. Mặc định ưu tiên meme chưa dùng; lần thứ 2 chỉ khi vẫn phù hợp với cảm xúc và cách đủ xa lần đầu. Đếm theo nội dung/cảnh meme, không theo tag hoặc tên file: bản đổi tên, cắt ngắn, đổi độ phân giải hoặc chuyển định dạng vẫn là cùng meme. Quy tắc meme áp dụng cả meme dạng ảnh; ảnh minh hoạ nội dung vẫn chỉ được dùng 1 lần.
 - Trước khi giao, thống kê số lần dùng từng meme trong bảng phân cảnh thực tế. Nếu app bốc ngẫu nhiên mà không giới hạn số lần, chia tag theo cảnh hoặc giới hạn số nhịp của từng tag để mọi cách chọn đều không vượt 2 lần; kiểm tra cả meme trùng nội dung nằm ở các tag khác nhau. Thiếu lựa chọn thì dùng meme khác phù hợp hoặc tải thêm, không nới giới hạn, không đổi hàng loạt meme thành ảnh để né giới hạn.
 - Chuẩn bị ít nhất số ảnh khác nhau bằng số nhịp cần ảnh của tag. Nếu app chỉ tránh lặp hai nhịp liền nhau, tạo tag cụ thể riêng cho từng cảnh và chỉ đặt ảnh được chọn vào tag đó để tránh app chọn lại ảnh cũ. Độ khớp nội dung quan trọng hơn số lượng; thiếu thì tìm thêm ảnh đúng nội dung.
-- **1 hình / 1 nhịp.** Không để "giữ clip dòng trước" (tuỳ chọn trong app nên tắt).
-- **Bắt buộc phối hợp minh hoạ nội dung và meme**, trừ khi người dùng yêu cầu phong cách khác. Mục tiêu khoảng 40–50% nhịp dùng meme khi nội dung phù hợp; không biến video thành toàn ảnh minh hoạ. Ảnh/clip/sơ đồ dùng cho giới thiệu chủ thể, hành động và giải thích hiện tượng; meme dùng cho phản ứng bất ngờ, con số gây choáng, suy ngẫm hoặc chuyển ý. Không để quá 4 nhịp liên tiếp cùng một loại khi có thể xen kẽ hợp lý.
+- **1 hình / 1 nhịp.** Không bật `carry`/không để trống clip để giữ ảnh dòng trước.
+- **Ảnh luôn cách hai mép màn hình tối thiểu 1 khoảng (meme_w ≤ 960, tương đương lề ngang ≥ 60px mỗi bên)** để không dính mép.
+- **Bắt buộc phối hợp minh hoạ nội dung và meme, trừ khi người dùng yêu cầu phong cách khác hoặc nội dung thuộc nhóm thương vong/tang tóc.** Mục tiêu khoảng 40–50% nhịp dùng meme khi nội dung phù hợp; không biến video thành toàn ảnh minh hoạ. Ảnh/clip/sơ đồ dùng cho giới thiệu chủ thể, hành động và giải thích hiện tượng; meme dùng cho phản ứng bất ngờ, con số gây choáng, suy ngẫm hoặc chuyển ý. Không để quá 4 nhịp liên tiếp cùng một loại khi có thể xen kẽ hợp lý.
 - **Bao phủ danh từ theo cả đoạn/video, không bắt mỗi lần nhắc lại đều phải có ảnh thật.** Ví dụ: giới thiệu Proxima bằng ảnh đúng sao đó, nhịp tiếp nói khoảng cách 4,2 năm ánh sáng có thể dùng meme sốc; giới thiệu Andromeda bằng ảnh đúng thiên hà, nhịp nhấn vào 2,5 triệu năm có thể dùng meme. Giữ đủ ảnh cho chủ thể mới và sơ đồ cho lời giải thích chính, đồng thời chủ động chọn meme cho các nhịp phản ứng.
 - **Không tự tạo ảnh minh hoạ / card đồ hoạ** — tải ảnh, clip hoặc sơ đồ có sẵn trên mạng và dùng meme có sẵn khi phù hợp.
 - Tag = **thư mục theo chủ thể** cho ảnh thật, **thư mục theo cảm xúc** cho meme.
@@ -274,12 +308,37 @@ dung thật, không phải đồ hoạ tự bịa.
 
 ## 10. Checklist trước khi giao
 
-- [ ] **Mọi ảnh/clip** — minh họa theo nội dung (`assets/illus/<nội-dung>/<tag>/`) và meme (`assets/memes/<tag>/`) — đều đã tải sẵn trước khi giao.
-  ở cuối checklist, `bad` phải rỗng; thiếu thì tải bổ sung trước khi giao, không giao kịch bản "nợ" hình.
+- [ ] **Mọi ảnh/clip** — minh họa theo nội dung (`assets/illus/<nội-dung>/<tag>/`) và meme (`assets/memes/<tag>/`) — đều đã tải sẵn trước khi giao. Chạy lệnh kiểm tra ở cuối checklist, `bad` phải rỗng; thiếu thì tải bổ sung trước khi giao, không giao kịch bản "nợ" hình.
+- [ ] **Độ dài 16–18 nhịp** cho video thường (trừ khi nguồn thật sự hết nội dung và đã báo lý do); mỗi nhịp có ảnh riêng, không để trống clip.
+- [ ] **Bookend**: ảnh nhịp đầu và ảnh nhịp cuối là cùng một file/nội dung (đối chiếu hash), và câu kết nhắc đúng thứ ảnh thể hiện.
+- [ ] **Kết bài không cụt**: nhịp cuối khép lại ý đã mở ở hook hoặc nêu bài học/ý nghĩa; không dừng ở việc tả một vật thể hay con số thiệt hại; không có câu chào kết.
+- [ ] **Mạch kể không cụt ở giữa**: với từng cụm ý chính, kiểm tra đủ chuỗi
+  chuyện xảy ra → nguyên nhân/cách diễn ra → kết quả/ý nghĩa hoặc bước tiếp theo.
+  Đọc lại sau mỗi cụm bằng câu hỏi “vậy thì sao?”; nếu câu trả lời chưa nằm trong
+  kịch bản thì bổ sung cầu nối hoặc viết lại. Kiểm tra cả các ví dụ, phép so sánh,
+  con số và câu chuyển ý; không coi chúng là phần giải thích thay thế cho kết quả.
+- [ ] **Không chế nội dung khi nối mạch**: mọi chi tiết thực tế, nguyên nhân, động cơ,
+  kết quả và quan hệ nhân–quả trong bản biên tập đều phải truy được về đầu vào hoặc
+  nguồn đã kiểm tra. Câu nối chỉ sắp xếp và giải thích dữ kiện có sẵn; không được tự
+  bịa một bước trung gian để câu chuyện nghe trơn tru. Nếu nguồn không đủ để kết luận,
+  phải viết theo mức chắc chắn phù hợp hoặc báo rõ phần chưa xác định.
+- [ ] **Không có tham chiếu treo**: rà các từ “này”, “đó”, “nó”, “lần nữa”,
+  “như vậy”, “sau đó” và cụm xác định tương tự; mỗi từ phải trỏ rõ về một đối tượng
+  hoặc sự kiện đã xuất hiện trước đó. Nếu người xem phải hỏi “này là gì?” thì viết lại
+  bằng danh từ cụ thể hoặc thêm nhịp giới thiệu.
+- [ ] **Quan hệ giữa các nhịp rõ ràng**: không có nhịp chỉ nêu một nguyên nhân,
+  cơ chế, hình ảnh hoặc sự kiện rồi chuyển chủ đề mà thiếu câu cho biết nó dẫn đến
+  điều gì. Không chia nhịp làm mất quan hệ trước–sau, nguyên nhân–kết quả hoặc
+  vấn đề–cách giải quyết.
+- [ ] **Bố cục khung hình**: ảnh neo đáy tại `meme_y=150` + `meme_h=640` (đáy y≈750), chữ căn giữa `text_y=880`; đáy ảnh không đè lên đỉnh chữ (khoảng cách ~20px); ảnh cách mỗi mép ngang ≥60px (`meme_w ≤ 960`).
+- [ ] **Cách gọi con vật**: dùng tên riêng, "nó", "chú chó/chú mèo…"; không dùng đại từ chỉ người ("cô", "anh", "chị", "ông").
+- [ ] **Kiểm tra phát âm TTS**: các tên riêng nước ngoài, thuật ngữ và từ viết tắt
+  khó đọc đã được phiên âm trong phần lời đọc; chữ hiển thị vẫn giữ tên gốc khi
+  cần nhận diện. Tên gốc cũng phải được giữ ở nguồn hoặc bảng minh họa.
 - [ ] Mỗi nhịp có tag và ≥1 file phù hợp trong `assets/illus/<nội-dung>/<tag>/` hoặc `assets/memes/<tag>/`. Có file chưa đủ: đã mở ảnh và xác nhận khớp đúng chủ thể/hành động của nhịp.
 - [ ] Danh sách danh từ/chủ thể quan trọng đã được bao phủ bằng ảnh cụ thể; tên riêng đúng đối tượng, cảnh quan hệ có đủ các thành phần cần thiết. Không bỏ sót chủ thể chỉ vì thiếu ảnh trong thư viện cũ.
 - [ ] Có cả minh hoạ nội dung và meme, mục tiêu khoảng 40–50% nhịp meme khi phù hợp. Mỗi chủ thể quan trọng đã có ảnh ở nhịp giới thiệu/giải thích; meme ở nhịp phản ứng không bị đánh dấu là thiếu minh hoạ chỉ vì nhắc lại danh từ hoặc số liệu.
-- [ ] **Không ảnh minh hoạ nội dung nào lặp lại trong toàn video; mỗi meme tối đa 2 lần**, kể cả nằm ở tag khác. Đối chiếu file, hash và nội dung để phát hiện bản sao đổi tên/đổi kích thước/cắt lại. Không lặp cùng meme ở hai nhịp liền nhau; phân bổ ưu tiên meme chưa dùng. Giữ phối hợp ảnh và meme theo mục 5 khi thay tài nguyên trùng. (Post Threads: cùng một card dùng cho mọi nhịp của đoạn văn đó — xem mục 7.)
+- [ ] **Không ảnh minh hoạ nội dung nào lặp lại trong toàn video; mỗi meme tối đa 2 lần**, kể cả nằm ở tag khác — trừ cặp ảnh bookend mở/kết. Đối chiếu file, hash và nội dung để phát hiện bản sao đổi tên/đổi kích thước/cắt lại. Không lặp cùng meme ở hai nhịp liền nhau; phân bổ ưu tiên meme chưa dùng. Giữ phối hợp ảnh và meme theo mục 5 khi thay tài nguyên trùng. (Post Threads: cùng một card dùng cho mọi nhịp của đoạn văn đó — xem mục 7.)
 - [ ] Có thống kê meme đã dùng (tên/cảnh, số lần và nhịp xuất hiện) và **Phần C — Meme nên tải thêm cho lần sau**, gắn với những thiếu hụt thực tế của thư viện; các đề xuất có tình huống, số clip cần thêm, tag và từ khoá tìm.
 - [ ] Số liệu chính xác nằm trong chữ hiển thị. Nhịp giải thích phép đo/quan hệ có ảnh hoặc sơ đồ tương ứng; nhịp gây bất ngờ bằng con số được dùng meme khi đối tượng đã có minh hoạ trong đoạn. Không bắt buộc ảnh gốc phải in sẵn số và không dùng sơ đồ có số mâu thuẫn lời đọc.
 - [ ] Mỗi file tải có nguồn và tình trạng quyền sử dụng được ghi trung thực; giấy phép chưa rõ đã ghi để người dùng xử lý sau, không dùng làm lý do bỏ thiếu minh hoạ.
@@ -292,7 +351,7 @@ dung thật, không phải đồ hoạ tự bịa.
   .venv\Scripts\python.exe -c "from videomaker import pipeline as pl; from pathlib import Path; lib=pl.scan_memes(); ill=pl.scan_illust('ten-noi-dung'); rows=pl.analyze(Path('duong-dan-kich-ban.txt').read_text(encoding='utf-8'), content='ten-noi-dung'); bad=[r for r in rows if not r[4]]; print(len(rows),'nhịp, thiếu clip:',len(bad))"
   ```
   (Thay `ten-noi-dung` và `duong-dan-kich-ban.txt` bằng nội dung và file kịch bản đang làm. `bad` phải rỗng — nếu không thì bổ sung file cho tag đó.)
-- [ ] Đã lưu `kich-ban.txt`, media và nguồn; bàn giao để người dùng kiểm tra. Chỉ khi người dùng yêu cầu render/xuất video mới thử khung hình bằng nút "👁 Xem thử bố cục" trước khi xuất.
+- [ ] Đã lưu `kich-ban.txt`, media và nguồn; bàn giao để người dùng kiểm tra. Chỉ khi người dùng yêu cầu render/xuất video mới chạy preview (`python tools/render_script.py <kich-ban.txt> --content <ten> --preview`) và cho người dùng duyệt trước khi xuất bản cuối.
 
 ## 11. Ví dụ
 

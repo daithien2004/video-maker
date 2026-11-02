@@ -11,11 +11,6 @@ if not exist ".venv\Scripts\python.exe" (
   pause
   exit /b 1
 )
-echo Dang mo Video Maker... (trinh duyet se tu mo; dong cua so nay de tat ung dung)
-if not exist "frontend\dist\index.html" (
-  echo Chua build giao dien React. Hay chay install.bat truoc.
-  pause
-  exit /b 1
-)
-".venv\Scripts\python.exe" -m videomaker
+echo Dang mo giao dien VideoMaker tai http://127.0.0.1:7860
+".venv\Scripts\python.exe" -m videomaker.api
 pause

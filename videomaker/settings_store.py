@@ -1,4 +1,4 @@
-"""Persist application settings separately from the user's current video draft."""
+"""Persist video rendering settings."""
 from __future__ import annotations
 
 import json
@@ -6,13 +6,7 @@ import os
 import threading
 from pathlib import Path
 
-DRAFT_KEYS = frozenset({'script', 'content'})
 _LOCK = threading.RLock()
-
-
-def draft_path(settings_file: Path) -> Path:
-    return settings_file.parent.parent / 'work' / 'video-draft.json'
-
 
 def _read(path: Path) -> dict:
     try:
@@ -31,25 +25,11 @@ def _write(path: Path, value: dict) -> None:
     os.replace(temporary, path)
 
 
-def load_state(settings_file: Path) -> tuple[dict, dict]:
-    """Move legacy draft keys only after safely saving the draft; never replace an existing draft."""
+def load_settings(settings_file: Path) -> dict:
     with _LOCK:
-        settings = _read(settings_file)
-        destination = draft_path(settings_file)
-        draft = _read(destination)
-        if DRAFT_KEYS.intersection(settings):
-            if not destination.exists():
-                draft = {key: settings.get(key, '') for key in DRAFT_KEYS}
-                _write(destination, draft)
-            settings = {key: value for key, value in settings.items() if key not in DRAFT_KEYS}
-            _write(settings_file, settings)
-        return settings, {key: draft.get(key, '') for key in DRAFT_KEYS}
+        return _read(settings_file)
 
 
-def save_state(settings_file: Path, settings: dict, draft_updates: dict) -> None:
+def save_settings(settings_file: Path, settings: dict) -> None:
     with _LOCK:
-        _, draft = load_state(settings_file)
-        if draft_updates:
-            draft.update({key: value for key, value in draft_updates.items() if key in DRAFT_KEYS})
-            _write(draft_path(settings_file), draft)
-        _write(settings_file, {key: value for key, value in settings.items() if key not in DRAFT_KEYS})
+        _write(settings_file, settings)

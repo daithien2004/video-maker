@@ -44,7 +44,7 @@ AUDIO_EXT = {".mp3", ".wav", ".m4a", ".ogg", ".flac"}
 
 W, H = 1080, 1920   # khung dọc; fps lấy theo opt.fps (mặc định 60)
 LEAD = 0.25   # giây im lặng đầu video
-GAP = 0.18    # khoảng nghỉ giữa các dòng
+GAP = 0.15    # khoảng nghỉ giữa các dòng
 TAIL = 0.6    # giây im lặng cuối video
 ZOOM_HOLD = 1.0   # giữ card đã phóng to thêm chút sau tiếng zoom cho kịp nhìn
 ZOOM_IN = 0.18    # thời gian phóng + nảy của nhịp zoom
@@ -79,6 +79,14 @@ def ffprobe_path() -> str:
     if not p:
         raise RuntimeError("Không tìm thấy ffprobe. Hãy chạy lại install.bat.")
     return p
+
+
+def exported_videos() -> list[Path]:
+    """Return exported MP4 files from output/ and its topic subdirectories."""
+    try:
+        return [path for path in OUT_DIR.rglob("*.mp4") if path.is_file()]
+    except OSError:
+        return []
 
 
 def strip_accents(s: str) -> str:
@@ -469,23 +477,23 @@ class Options:
     upper: bool = True
     font: str = "Segoe UI Black"
     font_size: int = 120
-    text_color: str = "#FF9A1F"
-    outline_color: str = "#FFFFFF"
+    text_color: str = "#FFFFFF"      # bậc chữ nhỏ: nền trắng, viền là outline_color
+    outline_color: str = "#FF9A1F"
     outline_w: int = 9
-    text_y: int = 1010
+    text_y: int = 820
     max_words: int = 4
     pop: bool = True
     meme_w: int = 960
     meme_h: int = 560
     meme_y: int = 210
     meme_anchor: str = "top"        # "top" = ảnh dính mép trên khung · "bottom" = dính mép dưới
-    text_anchor: str = "center"     # "center" = chữ canh giữa quanh text_y · "top" = text_y là mép trên
+    text_anchor: str = "top"        # "center" = chữ canh giữa quanh text_y · "top" = text_y là mép trên
     carry: bool = True              # dòng không có thẻ thì giữ clip meme trước đó
     use_music: bool = False
     music_volume: float = 0.08
     nvenc: bool = False
-    emph_color: str = "#FFE600"   # màu từ quan trọng (đánh dấu *từ*)
-    emph_scale: float = 1.3        # từ quan trọng to gấp mấy lần
+    emph_color: str = "#FF9A1F"   # bậc chữ lớn: nền màu nhấn, viền trắng
+    emph_scale: float = 1.4       # bậc nhấn to gấp mấy lần bậc nhỏ
     card_motion: bool = True       # card ảnh nở nhẹ + trôi chậm trong mỗi mục
     karaoke: bool = True           # tô sáng lần lượt từng từ khi đọc (chỉ nhịp có chữ)
     bg_motion: bool = True         # nền phóng chậm suốt video để khung hình không đứng yên
@@ -638,24 +646,88 @@ def _is_number(word: str) -> bool:
     return bool(re.fullmatch(r"\d[\d.,:/%-]*[a-zA-Z%]?", word))
 
 
+# đơn vị đi liền sau số, không tách: "105 ki lô mét", "3 tháng 11", "385 triệu đô la"
+_UNIT_WORDS = {
+    "tháng", "ngày", "năm", "giờ", "phút", "giây", "người", "ngôi", "nhà", "căn",
+    "chiếc", "tấn", "mét", "km", "ki", "lô", "triệu", "tỉ", "tỷ", "trăm", "nghìn",
+    "ngàn", "đô", "la", "mỹ", "phần",
+}
+
+
+def _word_key(word: str) -> str:
+    return word.strip("\"'()“”").rstrip(_BREAK_CHARS).lower()
+
+
+def _spoken_weight(word: str) -> int:
+    """Ước lượng 'độ dài đọc' của một từ hiển thị để canh thời gian xuất hiện.
+
+    TTS đọc số thành nhiều âm tiết (1997 → một chín chín bảy), nên một từ chứa
+    số được tính nặng hơn từ thường để cụm sau không xuất hiện quá sớm.
+    """
+    w = word.strip().strip("*").strip(".,;:!?…\"'()[]").strip()
+    if not w:
+        return 1
+    if "/" in w:
+        parts = [p for p in w.split("/") if p]
+        return max(1, sum(_spoken_weight(p) for p in parts) + (1 if len(parts) > 1 else 0))
+    digits = w.replace(".", "").replace(",", "").replace(" ", "")
+    if digits.isdigit():
+        # năm 4 chữ số → đọc theo chữ số (4 âm tiết); số lớn → theo chữ số.
+        return max(1, len(digits))
+    return 1
+
+
+def _can_split(left: str, right: str) -> bool:
+    """Ranh giới này có được phép cắt không (không cắt giữa cụm nghĩa)."""
+    a, b = _word_key(left), _word_key(right)
+    if _is_glue(left):
+        return False
+    if _is_number(left) and b in _UNIT_WORDS:
+        return False
+    if a in _UNIT_WORDS and b in _UNIT_WORDS:
+        return False
+    if _is_number(right) and a in {"năm", "tháng"}:
+        return False
+    return True
+
+
 def _split_run(run: list, max_words: int) -> list[list]:
-    """Chia một đoạn (không có dấu câu) thành các cụm đều nhau, tránh cắt giữa cụm từ."""
+    """Chia một đoạn (không có dấu câu) thành các cụm đều nhau, tránh cắt giữa cụm từ.
+
+    Chọn điểm cắt gần vị trí chia đều nhất nhưng vẫn là ranh giới hợp nghĩa
+    (sau từ nối, không tách số khỏi đơn vị, không cắt giữa cụm *nhấn mạnh* —
+    cụm nhấn mạnh là một đơn vị nghĩa của người viết, tách ra sẽ thành
+    "NAM" đứng trước "VIỆT NAM"). Ranh giới đổi bậc chữ được ưu tiên nhẹ.
+    """
     if len(run) <= max_words:
         return [run]
     n = math.ceil(len(run) / max_words)
-    size = math.ceil(len(run) / n)
-    chunks = [run[i:i + size] for i in range(0, len(run), size)]
-    # đừng để cụm kết thúc bằng từ nối: "... của" | "Ông" | "A làm"
-    for i in range(len(chunks) - 1):
-        while len(chunks[i]) > 2 and _is_glue(chunks[i][-1][0]):
-            chunks[i + 1].insert(0, chunks[i].pop())
-    # đừng tách số khỏi từ đứng trước: "Năm" | "1960" -> "Năm 1960"
-    for i in range(1, len(chunks)):
-        while _is_number(chunks[i][0][0]) and len(chunks[i - 1]) > 1:
-            chunks[i].insert(0, chunks[i - 1].pop())
-    # cụm cuối chỉ còn 1 từ thì gộp vào cụm trước cho khỏi chớp
+    lo = 2 if len(run) >= 5 else 1
+    cuts: list[int] = []
+    for k in range(1, n):
+        ideal = k * len(run) / n
+
+        def key(i: int) -> tuple[float, int]:
+            toggle = run[i - 1][1] != run[i][1]
+            return abs(i - ideal) - (0.6 if toggle else 0.0), -i
+
+        cands = sorted(range(lo, len(run)), key=key)
+        allowed = [i for i in cands
+                   if all(abs(i - c) >= 2 for c in cuts)
+                   and not (run[i - 1][1] and run[i][1])
+                   and _can_split(run[i - 1][0], run[i][0])]
+        cuts.append(allowed[0] if allowed else int(round(ideal)))
+    cuts = sorted({max(1, min(len(run) - 1, c)) for c in cuts})
+    chunks, prev = [], 0
+    for c in cuts:
+        chunks.append(run[prev:c])
+        prev = c
+    chunks.append(run[prev:])
+    # cụm cuối/đầu chỉ có 1 từ thì gộp sang cụm bên cạnh cho khỏi chớp
     if max_words > 1 and len(chunks) > 1 and len(chunks[-1]) == 1:
         chunks[-2].extend(chunks.pop())
+    if max_words > 1 and len(chunks) > 1 and len(chunks[0]) == 1:
+        chunks[1][:0] = chunks.pop(0)
     return [c for c in chunks if c]
 
 
@@ -687,12 +759,16 @@ def split_chunks(text: str, max_words: int) -> list[str]:
     return [" ".join(w for w, _ in c) for c in split_items(parse_emph(text), max_words)]
 
 
-def layout_lines(items: list[tuple[str, bool]], opt: "Options") -> list[list[tuple[str, bool]]]:
-    """Chia cụm chữ thành các dòng cố định, dùng gần hết bề ngang màn hình."""
-    avail = W - 2 * 40 - 2 * opt.outline_w
-    base = opt.font_size
-    big = int(base * opt.emph_scale)
-    widths = [_text_width(w, big if e else base, opt.font) for w, e in items]
+def layout_lines(items: list[tuple[str, bool]], opt: "Options",
+                 size: int | None = None) -> list[list[tuple[str, bool]]]:
+    """Chia cụm chữ thành các dòng cố định, dùng gần hết bề ngang màn hình.
+
+    `size` là cỡ chữ áp cho cả cụm (cụm nhấn dùng cỡ lớn hơn); bỏ trống thì dùng cỡ gốc.
+    """
+    side = 120 if not getattr(opt, "threads", False) else 40
+    avail = W - 2 * side - 2 * opt.outline_w
+    base = int(size or opt.font_size)
+    widths = [_text_width(w, base, opt.font) for w, _ in items]
     space = _text_width(" ", base, opt.font)
     total = sum(widths) + space * (len(items) - 1)
     n0 = max(1, math.ceil(total / avail))
@@ -713,7 +789,7 @@ def layout_lines(items: list[tuple[str, bool]], opt: "Options") -> list[list[tup
             curw += add
         lines.append(cur)
         if len(lines) <= n and all(
-                sum(_text_width(w, big if e else base, opt.font) for w, e in ln)
+                sum(_text_width(w, base, opt.font) for w, _ in ln)
                 + space * (len(ln) - 1) <= avail for ln in lines):
             return lines
     return lines
@@ -723,43 +799,76 @@ def _inline_color(color: str) -> str:
     return "&H" + _ass_color(color)[4:] + "&"
 
 
-def _line_text(line: list[tuple[str, bool]], opt: "Options") -> str:
-    base = opt.font_size
-    big = int(base * opt.emph_scale)
-    pc, ec = _inline_color(opt.text_color), _inline_color(opt.emph_color)
-    parts = []
-    for w, e in line:
-        if e:
-            parts.append(f"{{\\fs{big}\\1c{ec}}}{w}{{\\fs{base}\\1c{pc}}}")
-        else:
-            parts.append(w)
-    return " ".join(parts)
+def _tier_size(opt: "Options", big: bool) -> int:
+    return int(opt.font_size * opt.emph_scale) if big else int(opt.font_size)
 
 
-def _karaoke_lines(lines: list[list[tuple[str, bool]]], seconds: float, opt: "Options") -> str:
+def _tier_style(opt: "Options", big: bool) -> str:
+    """Hai bậc chữ như video mẫu: nhỏ nền trắng viền màu nhấn, lớn nền màu nhấn viền trắng."""
+    if big:
+        fill, edge = opt.emph_color, opt.text_color
+        bord = max(1, round(opt.outline_w * 1.15))
+    else:
+        fill, edge = opt.text_color, opt.outline_color
+        bord = max(1, opt.outline_w)
+    return (f"{{\\fs{_tier_size(opt, big)}\\bord{bord}"
+            f"\\1c{_inline_color(fill)}\\3c{_inline_color(edge)}}}")
+
+
+def _karaoke_lines(tier_lines: list[tuple[bool, list[tuple[str, bool]]]], seconds: float,
+                   opt: "Options") -> str:
     """Chữ kèm tag \\kf: tô sáng lần lượt từng từ trong cụm.
 
     TTS chỉ trả tổng thời lượng nên thời lượng mỗi từ chia theo độ dài từ — đủ khớp
     để mắt bám theo chữ, không cần canh giọng thật.
     """
-    words = [w for ln in lines for w, _ in ln]
+    words = [w for _, ln in tier_lines for w, _ in ln]
     weights = [len(w) + 1 for w in words]
     total = float(sum(weights)) or 1.0
-    base, big = opt.font_size, int(opt.font_size * opt.emph_scale)
-    pc, ec = _inline_color(opt.text_color), _inline_color(opt.emph_color)
     parts: list[str] = []
     i = 0
-    for ln in lines:
+    for big, ln in tier_lines:
         seg = []
-        for w, emph in ln:
+        for w, _ in ln:
             tag = f"\\kf{max(1, round(seconds * weights[i] / total * 100))}"
             i += 1
-            if emph:
-                seg.append(f"{{{tag}\\fs{big}\\1c{ec}}}{w}{{\\fs{base}\\1c{pc}}}")
-            else:
-                seg.append(f"{{{tag}}}{w}")
-        parts.append(" ".join(seg))
+            seg.append(f"{{{tag}}}{w}")
+        parts.append(_tier_style(opt, big) + " ".join(seg))
     return r"\N".join(parts)
+
+
+_TRIM_PUNCT = ",.;:!?…"
+
+
+def _trim_chunk(chunk: list[tuple[str, bool]]) -> list[tuple[str, bool]]:
+    """Bỏ dấu câu cuối từ khi hiển thị: chữ trên hình không cần dấu phẩy/chấm,
+    dấu câu vẫn giữ nguyên trong lời đọc để TTS ngắt nghỉ đúng."""
+    out = []
+    for w, e in chunk:
+        w = w.rstrip(_TRIM_PUNCT)
+        if w:
+            out.append((w, e))
+    return out
+
+
+def _tier_groups(chunk: list[tuple[str, bool]]) -> list[tuple[bool, list[tuple[str, bool]]]]:
+    """Gom từ liền nhau cùng bậc chữ, giữ nguyên thứ tự đọc.
+
+    Từ có `*nhấn mạnh*` hiện ở bậc lớn (nền cam, viền trắng), từ thường ở bậc nhỏ
+    (nền trắng, viền cam). Mỗi nhóm là một dòng riêng, xếp chồng như video mẫu.
+    """
+    groups: list[tuple[bool, list[tuple[str, bool]]]] = []
+    for w, e in chunk:
+        if groups and groups[-1][0] == e:
+            groups[-1][1].append((w, e))
+        else:
+            groups.append((e, [(w, e)]))
+    return groups
+
+
+def _line_advance(size: int) -> float:
+    """Chiều cao một dòng chữ; đo trên khung dựng thật ra ~1,28 lần cỡ chữ."""
+    return size * 1.28
 
 
 def build_ass(timed: list[dict], opt: Options) -> str:
@@ -781,42 +890,120 @@ def build_ass(timed: list[dict], opt: Options) -> str:
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
     ]
     pop = r"\fscx80\fscy80\t(0,110,\fscx100\fscy100)" if opt.pop else ""
-    an = 8 if opt.text_anchor == "top" else 5
+    an = 5 if not getattr(opt, "threads", False) else (8 if getattr(opt, "text_anchor", "top") == "top" else 5)
     for t in timed:
         disp = t["display"].upper() if opt.upper else t["display"]
         disp = disp.replace("{", "(").replace("}", ")").replace("\\", "")
         chunks = split_items(parse_emph(disp), opt.max_words)
         if not chunks:
             continue
-        weights = [sum(len(w) + 1 for w, _ in c) for c in chunks]
+        weights = [sum(_spoken_weight(w) for w, _ in c) for c in chunks]
         total_w = float(sum(weights))
         span = t["text_end"] - t["start"]
         cur = t["start"]
         for c, w in zip(chunks, weights):
             end = cur + span * (w / total_w)
-            laid = layout_lines(c, opt)
-            if karaoke:
-                text = _karaoke_lines(laid, end - cur, opt)
+            chunk = _trim_chunk(c)
+            if not chunk:
+                cur = end
+                continue
+            # Mỗi bậc là một dòng riêng, hiện đúng lúc từ đầu tiên của nó được đọc:
+            # bậc nhỏ hiện trước, bậc lớn (phần *nhấn mạnh*) hiện sau, xếp bên dưới
+            # và giữ tới hết cụm — giống nhịp lên chữ trong video mẫu.
+            sent_total = float(sum(_spoken_weight(word) for word, _ in chunk)) or 1.0
+            elapsed = 0.0
+            y = float(opt.text_y)
+            if opt.threads:
+                # Threads: mỗi bậc là một dòng riêng, hiện đúng lúc từ đầu tiên được đọc,
+                # xếp chồng và giữ tới hết cụm (hành vi gốc).
+                elapsed = 0.0
+                y = float(opt.text_y)
+                groups = list(_tier_groups(chunk))
+                for big, words in groups:
+                    start = cur + (end - cur) * elapsed / sent_total
+                    size = _tier_size(opt, big)
+                    laid = layout_lines(words, opt, size)
+                    if karaoke:
+                        text = _karaoke_lines([(big, ln) for ln in laid], end - start, opt)
+                    else:
+                        text = _tier_style(opt, big) + r"\N".join(
+                            " ".join(word for word, _ in ln) for ln in laid)
+                    lines.append(
+                        f"Dialogue: 0,{_ass_time(start)},{_ass_time(end)},Main,,0,0,0,,"
+                        f"{{\\an{an}\\q2\\pos({W // 2},{int(round(y))}){pop}}}{text}"
+                    )
+                    y += len(laid) * _line_advance(size)
+                    elapsed += sum(_spoken_weight(word) for word, _ in words)
             else:
-                text = r"\N".join(_line_text(ln, opt) for ln in laid)
-            lines.append(
-                f"Dialogue: 0,{_ass_time(cur)},{_ass_time(end)},Main,,0,0,0,,"
-                f"{{\\an{an}\\q2\\pos({W // 2},{opt.text_y}){pop}}}{text}"
-            )
+                # Video thường: một dòng duy nhất, giữ nguyên toàn bộ cụm (không tách
+                # theo thời gian) để nội dung liên kết không bị chẻ; từ nhấn mạnh được
+                # tô kiểu riêng ngay tại chỗ.
+                items = chunk
+                fit_opt = opt
+                if items:
+                    side = 120 if not getattr(opt, "threads", False) else 40
+                    avail = W - 2 * side - 2 * opt.outline_w
+                    widths = [_text_width(w, int(opt.font_size * (opt.emph_scale if e else 1)), opt.font)
+                              for w, e in items]
+                    space = _text_width(" ", opt.font_size, opt.font)
+                    total = sum(widths) + space * (len(items) - 1)
+                    if total > avail and total > 0:
+                        scale = avail / total
+                        fit_opt = replace(opt, font_size=max(10, int(opt.font_size * scale)))
+                laid = layout_lines(items, fit_opt, fit_opt.font_size)
+                if karaoke:
+                    weights = [len(w) + 1 for w, _ in items]
+                    total_w = float(sum(weights)) or 1.0
+                    wi = 0
+                    text_lines = []
+                    for ln in laid:
+                        line_str = ""
+                        cur_big = None
+                        for w, e in ln:
+                            if e != cur_big:
+                                line_str += _tier_style(fit_opt, e)
+                                cur_big = e
+                            dur = max(1, round((end - cur) * weights[wi] / total_w * 100))
+                            wi += 1
+                            line_str += f"{{\\kf{dur}}}{w} "
+                        text_lines.append(line_str.rstrip())
+                    text = r"\N".join(text_lines)
+                else:
+                    text_lines = []
+                    for ln in laid:
+                        segs = []
+                        buf = []
+                        cur_e = None
+                        for w, e in ln:
+                            if e != cur_e and buf:
+                                segs.append((cur_e, buf))
+                                buf = []
+                            cur_e = e
+                            buf.append(w)
+                        if buf:
+                            segs.append((cur_e, buf))
+                        line_str = " ".join(
+                            _tier_style(fit_opt, e) + " ".join(words) for e, words in segs)
+                        text_lines.append(line_str)
+                    text = r"\N".join(text_lines)
+                lines.append(
+                    f"Dialogue: 0,{_ass_time(cur)},{_ass_time(end)},Main,,0,0,0,,"
+                    f"{{\\an{an}\\q2\\pos({W // 2},{int(round(float(opt.text_y)))}){pop}}}{text}"
+                )
             cur = end
     return "\n".join(lines) + "\n"
 
 
 def _pause_after(text: str) -> float:
     """Nghỉ thêm sau mỗi nhịp theo dấu câu cuối: chấm/câu hỏi lâu hơn phẩy — nghe tự nhiên
-    hơn kiểu nghỉ đều 0.18s. Nhịp không có dấu câu cuối (cắt giữa cụm) nghỉ ngắn nhất."""
+    hơn kiểu nghỉ đều 0.15s. Nhịp không có dấu câu cuối (cắt giữa cụm) nghỉ ngắn nhất."""
     t = (text or "").rstrip().rstrip('"”’\')]')
     if not t:
         return 0.0
     if t[-1] in ".!?…":
-        return 0.32
+        return 0.15
     if t[-1] in ",;:":
-        return 0.12
+        return 0.06
     return 0.0
 
 
@@ -1278,6 +1465,8 @@ def _pass_bounds(n_spans: int, fps: int) -> list[int]:
 def render(rows: list[list], opt: Options, preview: bool = False, cb=None) -> Path:
     """rows: [[#, lời đọc, chữ hiển thị, thẻ, clip, ngữ cảnh?, zoom?], ...]  ->  đường dẫn file MP4."""
     cb = cb or (lambda f, m: None)
+    if not getattr(opt, "threads", False):
+        opt.meme_anchor = "bottom"
     rng = random.Random(opt.seed)
 
     beats: list[Beat] = []
@@ -1434,7 +1623,7 @@ def render(rows: list[list], opt: Options, preview: bool = False, cb=None) -> Pa
             top = MASCOT_TOP
             t0 = sp0["start"]
             swap_at = t0 + appear + hold
-            out_at = max(swap_at + 0.2, sp0["end"] - hide)
+            out_at = max(swap_at + 0.2, total - hide)
             u = f"((t-{t0:.3f})/{appear})"
             v = f"((t-{out_at:.3f})/{hide})"
             # y là mép trên của lớp phủ: phải chạy từ đáy khung (bottom) lên top,
@@ -1448,7 +1637,7 @@ def render(rows: list[list], opt: Options, preview: bool = False, cb=None) -> Pa
                     f"enable='between(t,{t0:.3f},{swap_at:.3f})'[ma]",
                     f"[1:v]scale=-2:{mh},setsar=1,fps={fps},format=rgba[b]",
                     f"[ma][b]overlay=x={_mascot_x(mp_b, mh)}:y='{y}':"
-                    f"enable='between(t,{swap_at:.3f},{sp0['end']:.3f})'[mb]"]
+                    f"enable='between(t,{swap_at:.3f},{total:.3f})'[mb]"]
             frags.append(dict(inputs=m_in, fg=m_fg, in_label=cur_in, out_label="mb", n_inputs=2))
             cur_in = "mb"
     # Reply: mục sau được báo trước bằng chính card của nó — hiện mờ, nhỏ bên dưới, nối
@@ -1612,12 +1801,22 @@ def render(rows: list[list], opt: Options, preview: bool = False, cb=None) -> Pa
     # hơn ngưỡng vẫn đi đúng một pass như cũ.
     stamp = f"{datetime.now():%Y%m%d_%H%M%S}"
     if preview:
-        out_name = f"preview_{stamp}.mp4"
+        topic = norm_tag(opt.content)[:40] or "video"
+        out_name = f"preview_{topic}_{stamp}.mp4"
     else:
         # tên file có chủ đề (tên Nội dung) để phân biệt video trong output/
         topic = norm_tag(opt.content)[:40] or "video"
         out_name = f"video_{topic}_{stamp}.mp4"
-    out_path = (WORK_DIR if preview else OUT_DIR) / out_name
+    if preview:
+        out_path = WORK_DIR / out_name
+    elif not getattr(opt, "threads", False):
+        out_dir = OUT_DIR / "kienthuc"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / out_name
+    else:
+        out_dir = OUT_DIR / topic
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / out_name
 
     n_spans = len(spans)
     # Mỗi mục card giữ buffer frame 1080x1920 trong graph, ~100MB lúc 60fps; dồn
@@ -1671,9 +1870,14 @@ def render(rows: list[list], opt: Options, preview: bool = False, cb=None) -> Pa
             # 5c) âm thanh: giọng đọc + tiếng chuyển mục (pop / whoosh) + nhạc nền
             fg_p.append("[1:a]anull[a0]")
             audio_mix = ["[a0]"]
-            pop = opt.pop_in and opt.threads
-            # Card nảy vào ngay từ đầu video (bài post) nên pop cũng kêu từ mục đầu tiên.
-            section_starts = _pop_starts(spans, first=pop)
+            if not getattr(opt, "threads", False):
+                # Video thường: chỉ kêu pop ở ảnh đầu tiên (hook).
+                pop = True
+                section_starts = [spans[0]["start"]] if (opt.sfx and spans) else []
+            else:
+                pop = opt.pop_in
+                # Card nảy vào ngay từ đầu video (bài post) nên pop cũng kêu từ mục đầu tiên.
+                section_starts = _pop_starts(spans, first=pop) if opt.sfx else []
             sfx_path = next((m for m in list_music()
                              if m.name.lower().startswith("pop" if pop else "whoosh")), None)
             if opt.sfx and section_starts and sfx_path is not None:
@@ -1875,5 +2079,3 @@ def analyze(script: str, seed: int | None = None, content: str = "") -> list[lis
     assign_clips(beats, seed, content)
     # Dấu - phải sống qua bảng chỉnh sửa; chuỗi rỗng khi render có nghĩa dùng lại lời đọc.
     return [[b.idx, b.spoken, b.display if b.display else "-", b.tag, b.clip] for b in beats]
-
-

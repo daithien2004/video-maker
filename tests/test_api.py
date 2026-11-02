@@ -83,26 +83,18 @@ class LocalAPITests(unittest.TestCase):
         response = self.client.post('/api/analyze', json={'script': '[sun] Xin chào. || XIN *CHÀO*', 'settings': {'content': ''}})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['rows'][0][1], 'Xin chào.')
-        response = self.client.post('/api/settings', json={'script': 'Bản đã lưu', 'settings': {'speed': 1.1, 'content': ''}})
+        response = self.client.post('/api/settings', json={'settings': {'speed': 1.1, 'content': ''}})
         self.assertEqual(response.status_code, 200)
         cfg = json.loads(actions.SETTINGS_FILE.read_text(encoding='utf-8'))
         self.assertNotIn('script', cfg)
-        self.assertNotIn('content', cfg)
-        draft = json.loads((self.root / 'work/video-draft.json').read_text(encoding='utf-8'))
-        self.assertEqual(draft['script'], 'Bản đã lưu')
+        self.assertEqual(cfg['content'], '')
         self.assertEqual(cfg['speed'], 1.1)
         self.assertFalse((self.root / 'settings.json').exists())
 
-    def test_settings_save_preserves_draft_and_bootstrap_separates_it(self):
-        response = self.client.post('/api/video-draft', json={'script': 'Keep my draft', 'settings': {'content': 'demo'}})
-        self.assertEqual(response.status_code, 200)
-        response = self.client.post('/api/settings', json={'settings': {'speed': 1.2}})
-        self.assertEqual(response.status_code, 200)
+    def test_bootstrap_exposes_render_settings_without_video_draft(self):
         boot = self.client.get('/api/bootstrap').json()
-        self.assertNotIn('script', boot['settings'])
-        self.assertNotIn('content', boot['settings'])
-        self.assertEqual(boot['settings']['speed'], 1.2)
-        self.assertEqual(boot['video_draft'], {'script': 'Keep my draft', 'content': 'demo'})
+        self.assertNotIn('video_draft', boot)
+        self.assertIn('content', boot['settings'])
 
     def test_upload_and_delete_only_target_asset_files(self):
         response = self.client.post('/api/library/upload', data={'kind': 'illus', 'tag': 'sun', 'content': 'space'},
@@ -309,7 +301,6 @@ class LocalAPITests(unittest.TestCase):
         restored_boot = TestClient(api.create_app()).get('/api/bootstrap').json()
         restored = restored_boot['settings']
         self.assertEqual(restored['threads_scrape'], options)
-        self.assertEqual(restored_boot['video_draft']['script'], before['script'])
         self.assertEqual(restored['voice'], before['voice'])
         self.assertEqual(self.client.post('/api/threads/options', json={'top': -1}).status_code, 400)
         self.assertEqual(actions.load_settings()['threads_scrape'], options)
