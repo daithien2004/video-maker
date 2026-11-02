@@ -24,13 +24,19 @@ Nhận lệnh "Làm video" → chọn sự kiện trong ngày → tự tìm ản
 
 ## Viết kịch bản (video thường)
 - Format: `[tag] lời đọc || CHỮ HIỂN THỊ`.
-- Mỗi nhịp chia thành **cụm ngắn 2–4 từ**, cách nhau bằng dấu phẩy; mỗi cụm = một lần hiển thị trên một dòng.
-- Mỗi cụm phải **đủ nghĩa độc lập**, không mượn từ giữa các cụm.
+- Mỗi nhịp chia thành **cụm ngắn 2–4 từ**, cách nhau bằng dấu phẩy; mỗi cụm = một lần hiển thị trên một dòng. Phải kiểm đếm sau khi viết: không có cụm 1 từ, không có cụm từ 5 từ trở lên (tên riêng/số liệu vẫn ghép với từ xung quanh để đủ cụm).
+- Mỗi cụm phải **đủ nghĩa độc lập**, không mượn từ giữa các cụm. Không tách cụm từ cố định hoặc đơn vị nghĩa như “quốc gia”, “nhà nghiên cứu”, “trí thông minh”, “thức ăn”; nếu một tên riêng chỉ có 1 từ thì ghép vào cụm liền kề.
+- Dấu phẩy giữa các cụm phải tạo nhịp tự nhiên về ngữ pháp; không tách động từ khỏi tân ngữ hoặc làm cụm bị cụt nghĩa. Ví dụ dùng “MÔ TẢ, MỘT CỖ MÁY, NHƯ VẬY”, không dùng “MÔ TẢ MỘT, CỖ MÁY NHƯ VẬY”.
+- Trước khi dựng, rà từng dấu phẩy ở phần chữ hiển thị: mỗi đoạn phải có 2–4 từ và đọc riêng vẫn hiểu; sửa lại đoạn bị cụt thay vì để bộ dựng tự chia.
+- Kiểm tra bằng đúng `parse_emph()` và `split_items()` của pipeline sau khi viết: mọi cụm thực sự xuất hiện trên video phải có 2–4 từ, không chỉ các đoạn do người viết ngăn bằng dấu phẩy. Nếu bộ dựng tự tạo cụm 1 từ hoặc tách sai cụm nghĩa, phải sửa chữ hiển thị trước khi render.
+- Không coi dấu chấm trong chữ viết tắt tên riêng như một điểm ngắt; ví dụ `GEORGE B. SELDEN` phải xuất hiện trong cùng một cụm, không bị tách thành hai lần hiển thị.
 - Từ/cụm nhấn mạnh bọc `*...*`; emphasis tô kiểu riêng tại chỗ.
+- Chỉ nhấn tên riêng, số liệu, danh từ hoặc cụm ý nghĩa cốt lõi. Không nhấn từ nối, đại từ, trạng từ, từ đơn lẻ thiếu trọng tâm hoặc cụm đệm như “như vậy”, “ngành”, “động lực” chỉ để tạo điểm sáng; mỗi nhịp nên có ít dấu nhấn nhưng phải có lý do nội dung rõ ràng.
 - Lời đọc giữ dạng đầy đủ để TTS đọc đúng; chữ hiển thị có thể dùng dạng viết tắt (KM/H, %, …) theo ý người dùng.
 - **Mỗi nhịp bắt buộc có ảnh riêng** (1 hình / 1 nhịp). Không để trống clip hay dùng `carry` để lặp ảnh qua nhiều nhịp chỉ nhằm tiết kiệm. `carry` chỉ dùng khi cần hiển thị nhiều cụm chữ của **cùng một nhịp**.
 - **Cách gọi con vật**: dùng tên riêng, "nó" hoặc "chú chó/chú mèo…". Không dùng đại từ chỉ người ("cô", "anh", "chị", "ông") cho con vật.
 - **Kết bài không được cụt**: nhịp cuối phải khép lại ý đã mở ở hook hoặc nêu bài học/ý nghĩa, không chỉ tả một vật thể rồi dừng. Trước đó có thể có một nhịp ý nghĩa; không thêm câu chào kết kiểu "cảm ơn đã xem".
+- **Đa dạng hook giữa các video**: không mặc định mở bằng ngày/năm. Nếu video gần nhất đã mở bằng mốc thời gian, video tiếp theo phải ưu tiên mở bằng nhân vật, vật thể, hành động hoặc kết quả nổi bật; chỉ đưa ngày/năm lên hook khi đó là chi tiết không thể thiếu để hiểu sự kiện. Trước khi chốt kịch bản, đối chiếu các video gần đây để tránh lặp cùng một kiểu mở đầu.
 - **Tên riêng phải đọc được bằng TTS**: nếu tên nước ngoài, thuật ngữ hoặc từ viết tắt
   khiến giọng đọc phát âm sai hoặc đánh vần máy móc, chỉ phiên âm trong lời đọc; chữ
   hiển thị giữ nguyên tên gốc để người xem nhận diện. Ví dụ: lời đọc `MÉT-SEN-GIƠ`,
@@ -58,6 +64,10 @@ Nhận lệnh "Làm video" → chọn sự kiện trong ngày → tự tìm ản
 - Kiểm tra ảnh minh họa đúng chủ thể/hành động đang đọc; loại ảnh lạc đề.
 - Ảnh thật chỉ dùng 1 lần toàn video; meme tối đa 2 lần, không liền kề. Đối chiếu cả file/hash/nội dung để phát hiện bản sao đổi tên, đổi kích thước hoặc cắt lại.
 - **Ảnh mở và ảnh kết phải là cùng một ảnh (bookend)** — đây là ngoại lệ duy nhất của quy tắc trên. Chọn ảnh khái quát dùng được cho cả hai đầu và viết câu kết nhắc đúng thứ ảnh thể hiện.
+- Trước khi render, phải lập bản đồ `tag -> file` và tính hash nội dung của từng file. Nếu cùng một hash xuất hiện ở hai nhịp không phải hook/kết, phải thay ảnh hoặc bỏ nhịp; không được chỉ đổi tên/copy file để qua kiểm tra. Nếu không đủ ảnh khác nhau, dừng và bổ sung ảnh trước khi dựng preview.
+- Không được dùng ảnh tài liệu, ảnh sự kiện khác hoặc ảnh chỉ có chủ thể chung khi lời đọc nêu địa điểm, hành động hay sự kiện cụ thể; phải mở kiểm tra trực quan từng file và đối chiếu tiêu đề nguồn trước khi render.
+- **Hard gate trước render:** hash của ảnh `hook` và `closing` phải giống hệt nhau; mọi hash khác chỉ được xuất hiện một lần. Nếu bookend sai hoặc bất kỳ tag nào có ảnh không khớp chủ thể/hành động/ngữ cảnh, phải dừng và sửa media/script, không được render preview để “kiểm tra tạm”.
+- Với từng nhịp, phải đối chiếu ảnh với đúng chủ thể/hành động/mốc thời gian trong lời đọc và trang nguồn; ảnh xe cổ chung không thay cho ảnh nhân vật, bằng sáng chế hay sự kiện cụ thể. Không dùng ảnh có tiêu đề, tên phát minh hoặc năm khác với mệnh đề đang đọc. Nếu không có ảnh khớp, bỏ hoặc viết lại mệnh đề thay vì dùng ảnh gần nghĩa.
 - Ghi nguồn vào `assets/illus/<nội-dung>/SOURCES.txt` (không đưa credit lên video).
 
 ## Render

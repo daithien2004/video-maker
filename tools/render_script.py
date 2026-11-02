@@ -22,6 +22,9 @@ def main():
 
     cfg = app.load_settings()
     if args.content:
+        content_dir = ROOT / "assets" / "illus" / args.content
+        if not content_dir.is_dir():
+            parser.error(f"Không tìm thấy thư viện minh họa: {content_dir}")
         cfg["content"] = args.content
     opt = app.make_opts(*[cfg[k] for k in app.OPT_KEYS])
     opt.backend = pl.BACKEND_DUMMY if cfg.get("backend") == "dummy" else opt.backend

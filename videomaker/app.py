@@ -438,7 +438,7 @@ def _fb_video_choices() -> list[tuple[str, str]]:
         out.append((fb.describe_video(p), str(p)))
     return out
 
-FB_SLOTS = {"2/ngày": ((11, 30), (20, 0)), "1/ngày": ((20, 0),)}
+FB_SLOTS = {"2/ngày": ((11, 30), (20, 0)), "1/ngày": ((11, 30),)}
 
 def _fb_batch_choices() -> list[tuple[str, str]]:
     """(nhãn có ghi chú đã hẹn, đường dẫn) cho danh sách tích hàng loạt."""
@@ -540,7 +540,8 @@ def _fb_caption_for(video: str, tags: str = "", fallback: str = "") -> tuple[str
     post = data.get("post") or {}
     extra = [(c.get("text") or "") for c in (data.get("comments") or [])[:3]]
     name = src.parent.parent.name if src.name == "threads.json" else src.parent.name
-    opts = cap.make_options(post.get("text") or "", name, tags, extra)
+    topic = "Mẹo / kiến thức" if src.name == "kich-ban.txt" else "Tự nhận diện"
+    opts = cap.make_options(post.get("text") or "", name, tags, extra, topic)
     if not opts:
         return "", "—"
     return opts[0]["caption"], name
@@ -800,15 +801,14 @@ def _fb_env_note() -> str:
             "(hoặc tạo `work/fb.env`) rồi mở lại app — hoặc nhập tay ở ô bên dưới.")
 
 def _fb_suggest_time() -> str:
-    """Giờ đăng gợi ý: 11:30 hoặc 20:00 gần nhất còn ≥ 15 phút nữa."""
+    """Giờ đăng gợi ý mặc định: 11:30 gần nhất còn ≥ 15 phút nữa."""
     now = datetime.now()
     for add in (0, 1):
         day = now + timedelta(days=add)
-        for hour, minute in ((11, 30), (20, 0)):
-            when = day.replace(hour=hour, minute=minute, second=0, microsecond=0)
-            if when >= now + timedelta(minutes=15):
-                return when.strftime("%d/%m/%Y %H:%M")
-    return (now + timedelta(days=1)).replace(hour=20, minute=0, second=0,
+        when = day.replace(hour=11, minute=30, second=0, microsecond=0)
+        if when >= now + timedelta(minutes=15):
+            return when.strftime("%d/%m/%Y %H:%M")
+    return (now + timedelta(days=1)).replace(hour=11, minute=30, second=0,
                                              microsecond=0).strftime("%d/%m/%Y %H:%M")
 
 def on_fb_save(page, token, version, tags):

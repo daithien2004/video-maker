@@ -44,7 +44,7 @@ AUDIO_EXT = {".mp3", ".wav", ".m4a", ".ogg", ".flac"}
 
 W, H = 1080, 1920   # khung dọc; fps lấy theo opt.fps (mặc định 60)
 LEAD = 0.25   # giây im lặng đầu video
-GAP = 0.15    # khoảng nghỉ giữa các dòng
+GAP = 0.10    # khoảng nghỉ giữa các dòng
 TAIL = 0.6    # giây im lặng cuối video
 ZOOM_HOLD = 1.0   # giữ card đã phóng to thêm chút sau tiếng zoom cho kịp nhìn
 ZOOM_IN = 0.18    # thời gian phóng + nảy của nhịp zoom
@@ -635,7 +635,12 @@ _GLUE_WORDS = {
 
 
 def _is_break(word: str) -> bool:
-    return bool(word) and word[-1] in _BREAK_CHARS
+    if not word or word[-1] not in _BREAK_CHARS:
+        return False
+    # Dấu chấm trong chữ viết tắt tên riêng (ví dụ "B.") không phải điểm ngắt.
+    if word[-1] == "." and re.fullmatch(r"[A-Za-zĐđĂăÂâÊêÔôƠơƯưÁáÀàẢảÃãẠạÉéÈèẺẻẼẽẸẹÍíÌìỈỉĨĩỊịÓóÒòỎỏÕõỌọÚúÙùỦủŨũỤụÝýỲỳỶỷỸỹỴỵ]\.", word):
+        return False
+    return True
 
 
 def _is_glue(word: str) -> bool:

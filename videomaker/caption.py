@@ -78,8 +78,16 @@ def detect_topic(text: str, topic: str = "Tự nhận diện") -> str:
     if topic in TOPICS:
         return topic
     plain = _plain(text)
-    scores = {name: sum(bool(re.search(r"\b" + re.escape(_plain(word)) + r"\b", plain))
-                        for word in rule[0].split("|")) for name, rule in TOPICS.items()}
+    source = (text or "").casefold()
+
+    def contains_phrase(phrase: str) -> bool:
+        # Match the original spelling so tone changes cannot turn "thử cũng"
+        # into the unrelated phrase "thú cưng".
+        return bool(re.search(r"(?<!\w)" + re.escape(phrase.casefold()) + r"(?!\w)",
+                              source))
+
+    scores = {name: sum(contains_phrase(word) for word in rule[0].split("|"))
+              for name, rule in TOPICS.items()}
     best = max(scores, key=scores.get)
     return best if scores[best] else "Chưa rõ chủ đề"
 
