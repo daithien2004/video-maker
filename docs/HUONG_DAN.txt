@@ -38,7 +38,9 @@ Các mục giao diện Gradio phía dưới được giữ để tham khảo b�
    Một trăm nghìn người đã xem || 100K người đã xem
 
  - [thẻ]  : thẻ cảm xúc để chọn clip meme (không phân biệt hoa/thường và dấu: [sốc] = [SOC] = [soc]).
- - ||     : phần trước là lời đọc, phần sau là chữ hiển thị.
+ - ||     : tuỳ chọn. Bỏ hẳn thì chữ hiển thị chính là lời đọc (app tự viết hoa, giữ *nhấn mạnh*);
+            chỉ dùng khi hai bên buộc phải khác, ví dụ tên phiên âm (Ca-xpi / CASPI) hay viết tắt
+            (50 ki lô mét trên giờ / *50 KM/H*). Dùng thì phần trước là lời đọc, phần sau là chữ hiển thị.
  - Chữ hiện dần theo cụm ngắn ("Số từ tối đa mỗi lần hiện"), và app ưu tiên ngắt sau dấu câu nên không
    cắt giữa cụm: "Năm 1960, Ông A làm gì đó" (3 từ/cụm) -> "Năm 1960," | "Ông A làm" | "gì đó".
    Số luôn dính với từ đứng trước ("Năm 1960", "tập 5"), không bị tách thành "Năm" | "1960".

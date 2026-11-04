@@ -38,7 +38,7 @@ _SAVE_LOCK = threading.Lock()
 OPT_KEYS = ["backend", "voice", "speed", "bg", "upper", "font", "font_size", "text_color",
             "outline_color", "outline_w", "text_y", "max_words", "pop", "meme_y", "meme_w",
             "meme_h", "carry", "use_music", "music_vol", "nvenc", "emph_color", "emph_scale",
-            "content", "gap", "threads_radius", "threads_side_margin", "threads_shadow", "threads_padding", "threads_max_height", "threads_padding_top", "threads_padding_right", "threads_padding_bottom", "threads_padding_left", "threads_zoom", "card_motion", "karaoke", "bg_motion", "pop_in", "sfx", "fps", "mascot", "next_card"]
+            "content", "gap", "threads_radius", "threads_side_margin", "threads_shadow", "threads_padding", "threads_max_height", "threads_padding_top", "threads_padding_right", "threads_padding_bottom", "threads_padding_left", "threads_zoom", "card_motion", "karaoke", "bg_motion", "pop_in", "sfx", "fps", "mascot", "next_card", "align_subs", "tier_gap_scale"]
 
 DEFAULTS = {
     "backend": pl.BACKEND_VIENEU, "voice": "", "speed": 1.0, "bg": "ngẫu nhiên",
@@ -46,10 +46,11 @@ DEFAULTS = {
     "outline_color": "#FF9A1F", "outline_w": 9, "text_y": 880, "max_words": 4, "pop": False,
     "meme_y": 150, "meme_w": 960, "meme_h": 640, "carry": True, "use_music": False,
     "music_vol": 0.08, "nvenc": False, "emph_color": "#FF9A1F", "emph_scale": 1.4,
+    "tier_gap_scale": 0.8,
     "content": "", "gap": pl.GAP, "threads_radius": 0, "threads_side_margin": 108,
     "threads_shadow": 0, "threads_padding": 0, "threads_max_height": 640, "threads_zoom": 140,
     "threads_padding_top": -1, "threads_padding_right": -1, "threads_padding_bottom": -1, "threads_padding_left": -1,
-    "card_motion": True, "karaoke": False, "bg_motion": True, "pop_in": False, "sfx": True, "fps": 60, "mascot": True, "next_card": True,
+    "card_motion": True, "karaoke": False, "bg_motion": True, "pop_in": False, "sfx": True, "fps": 60, "mascot": True, "next_card": True, "align_subs": True,
     "threads_scrape": {"top": 20, "mode": "auto", "ident": "avatar", "nested": True,
                        "reply_depth": 1, "reply_per_parent": 2},
 }
@@ -57,11 +58,11 @@ DEFAULTS = {
 _SLIDERS = {"speed": (0.8, 1.4), "font_size": (60, 200), "outline_w": (0, 20),
             "text_y": (300, 1700), "max_words": (1, 8), "meme_y": (60, 800),
             "meme_w": (300, 1080), "meme_h": (200, 900), "music_vol": (0.02, 0.4),
-            "emph_scale": (1.0, 1.8), "gap": (0.0, 2.0), "threads_radius": (0, 80),
+            "emph_scale": (1.0, 1.8), "tier_gap_scale": (0.6, 1.2), "gap": (0.0, 2.0), "threads_radius": (0, 80),
             "threads_zoom": (100, 200), "threads_side_margin": (0, 120), "threads_shadow": (0, 100), "threads_padding": (0, 200), "threads_max_height": (200, 1000), "fps": (24, 60),
             **{f"threads_padding_{side}": (-1, 200) for side in ("top", "right", "bottom", "left")}}
 _INT_KEYS = {"font_size", "outline_w", "text_y", "max_words", "meme_y", "meme_w", "meme_h", "threads_radius", "threads_side_margin", "threads_shadow", "threads_padding", "threads_max_height", "threads_padding_top", "threads_padding_right", "threads_padding_bottom", "threads_padding_left", "threads_zoom", "fps"}
-_FLOAT_KEYS = {"speed", "music_vol", "emph_scale", "gap"}
+_FLOAT_KEYS = {"speed", "music_vol", "emph_scale", "tier_gap_scale", "gap"}
 _BOOL_KEYS = {"upper", "pop", "carry", "use_music", "nvenc", "card_motion", "karaoke", "bg_motion", "pop_in", "sfx", "mascot", "next_card"}
 _HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
 
@@ -142,7 +143,7 @@ def make_opts(backend, voice, speed, bg, upper, font, font_size, text_color, out
               threads_padding=0, threads_max_height=640, threads_padding_top=-1,
               threads_padding_right=-1, threads_padding_bottom=-1, threads_padding_left=-1, threads_zoom=140,
               card_motion=True, karaoke=False, bg_motion=True, pop_in=True, sfx=True,
-              fps=60, mascot=True, next_card=True) -> pl.Options:
+              fps=60, mascot=True, next_card=True, align_subs=True, tier_gap_scale=0.8) -> pl.Options:
     return pl.Options(
         backend=backend, voice=voice or "", speed=float(speed), bg=bg or "ngẫu nhiên",
         content=(content or "").strip(), gap=float(gap),
@@ -152,6 +153,7 @@ def make_opts(backend, voice, speed, bg, upper, font, font_size, text_color, out
         meme_y=int(meme_y), meme_w=int(meme_w), meme_h=int(meme_h), carry=bool(carry),
         use_music=bool(use_music), music_volume=float(music_vol), nvenc=bool(nvenc),
         emph_color=emph_color or "#FF9A1F", emph_scale=float(emph_scale),
+        tier_gap_scale=float(tier_gap_scale),
         threads_radius=int(threads_radius),
         threads_side_margin=int(threads_side_margin),
         threads_shadow=int(threads_shadow),
@@ -162,7 +164,7 @@ def make_opts(backend, voice, speed, bg, upper, font, font_size, text_color, out
         threads_zoom=int(threads_zoom),
         card_motion=bool(card_motion), karaoke=bool(karaoke),
         bg_motion=bool(bg_motion), pop_in=bool(pop_in), sfx=bool(sfx), fps=int(fps),
-        mascot=bool(mascot), next_card=bool(next_card),
+        mascot=bool(mascot), next_card=bool(next_card), align_subs=bool(align_subs),
     )
 
 # --------------------------------------------------------------------------- xử lý sự kiện
@@ -174,6 +176,9 @@ def on_analyze(script, content):
     msg = f"Đã tách {len(rows)} dòng, gán được clip cho {n_clip} dòng. Sửa bảng bên dưới nếu cần rồi bấm xem thử."
     if n_clip == 0:
         msg += " (Chưa có clip nào khớp thẻ — thêm clip vào tab 'Thư viện' hoặc gõ tên file vào cột cuối.)"
+    warns = sd.lint_rows(rows)
+    if warns:
+        msg += "\n\n⚠️ **Cần rà:** " + "; ".join(warns) + "."
     return rows, msg
 
 # --------------------------------------------------------------------------- Threads
@@ -421,54 +426,6 @@ def _auto_schedule_draft(video: str) -> tuple[str, str, str]:
     return caption, _fb_suggest_time(), note
 
 # --------------------------------------------------------------------------- Facebook
-def _fb_video_choices() -> list[tuple[str, str]]:
-    """(nhãn, đường dẫn) các video đã xuất trong output/, mới nhất trước."""
-    out: list[tuple[str, str]] = []
-    try:
-        files = sorted(pl.exported_videos(),
-                       key=lambda p: p.stat().st_mtime, reverse=True)
-    except OSError:
-        files = []
-    for p in files:
-        try:
-            if p.stat().st_size <= 0:
-                continue
-        except OSError:
-            continue
-        out.append((fb.describe_video(p), str(p)))
-    return out
-
-FB_SLOTS = {"2/ngày": ((11, 30), (20, 0)), "1/ngày": ((11, 30),)}
-
-def _fb_batch_choices() -> list[tuple[str, str]]:
-    """(nhãn có ghi chú đã hẹn, đường dẫn) cho danh sách tích hàng loạt."""
-    log = fb.posted_log()
-    out: list[tuple[str, str]] = []
-    for label, path in _fb_video_choices():
-        item = log.get(Path(path).name) or {}
-        when = (item.get("when") or "").strip() if isinstance(item, dict) else ""
-        note = f" · đã hẹn {when}" if when and when != "ngay" else (" · đã đăng" if when else "")
-        out.append((label + note, path))
-    return out
-
-def _fb_plan(count: int, pattern: str) -> list[datetime]:
-    """Các mốc giờ trống kế tiếp theo nhịp đăng, bỏ qua giờ đã hẹn trước đó."""
-    now = datetime.now()
-    earliest = now + timedelta(minutes=15)
-    slots = FB_SLOTS.get(pattern) or FB_SLOTS["2/ngày"]
-    booked = fb.booked_times()
-    out: list[datetime] = []
-    for day in range(0, 90):
-        d = now + timedelta(days=day)
-        for hour, minute in slots:
-            when = d.replace(hour=hour, minute=minute, second=0, microsecond=0)
-            if when < earliest or when.strftime("%Y-%m-%d %H:%M") in booked:
-                continue
-            out.append(when)
-            if len(out) >= count:
-                return out
-    return out
-
 def _fb_dataset_for(video: str) -> Path | None:
     """Bài Threads đã tạo ra video này (file ghi kèm lúc xuất, không có thì đoán theo giờ)."""
     p = Path(video)
@@ -523,6 +480,12 @@ def _fb_script_for(video: str) -> Path | None:
             return script
     return None
 
+def _script_hook(text: str) -> str:
+    """Nhịp mở đầu (hook) của kịch bản video thường — câu mở caption khi lên lịch."""
+    beats = pl.parse_script(text or "")
+    return beats[0].spoken if beats else ""
+
+
 def _fb_caption_for(video: str, tags: str = "", fallback: str = "") -> tuple[str, str]:
     """(caption, nguồn) cho một video: ưu tiên caption chung, không thì soạn từ bài gốc."""
     if (fallback or "").strip():
@@ -541,169 +504,11 @@ def _fb_caption_for(video: str, tags: str = "", fallback: str = "") -> tuple[str
     extra = [(c.get("text") or "") for c in (data.get("comments") or [])[:3]]
     name = src.parent.parent.name if src.name == "threads.json" else src.parent.name
     topic = "Mẹo / kiến thức" if src.name == "kich-ban.txt" else "Tự nhận diện"
-    opts = cap.make_options(post.get("text") or "", name, tags, extra, topic)
+    hook = _script_hook(post.get("text") or "") if src.name == "kich-ban.txt" else ""
+    opts = cap.make_options(post.get("text") or "", name, tags, extra, topic, hook=hook)
     if not opts:
         return "", "—"
     return opts[0]["caption"], name
-
-def on_fb_auto_kienthuc(progress=_noop_progress):
-    """Đăng video đầu ngay, rồi hẹn các video sau mỗi ngày lúc 11:30."""
-    page, token, version = _fb_creds("", "", "")
-    if not page or not token:
-        raise AppError("Chưa có Page ID/token.\n\n" + _fb_env_note())
-    root = pl.OUT_DIR / "kienthuc"
-    posted = fb.posted_log()
-    all_videos = sorted(
-        (p for p in root.glob("*.mp4") if p.is_file()),
-        key=lambda p: (p.stat().st_mtime, p.name))
-    if not all_videos:
-        raise AppError("Không còn video kienthuc chưa đăng hoặc chưa hẹn.")
-    ready = []
-    tomorrow = (datetime.now() + timedelta(days=1)).replace(
-        hour=11, minute=30, second=0, microsecond=0)
-    for index, video in enumerate(all_videos):
-        if video.name in posted:
-            continue
-        if index == 0:
-            when = None
-        elif index <= 2:
-            when = tomorrow
-        else:
-            when = tomorrow + timedelta(days=index - 1)
-        caption, source = _fb_caption_for(str(video))
-        if not caption:
-            raise AppError(f"{video.name}: không tìm được kịch bản để tạo caption.")
-        ready.append((video, when, caption, source))
-    if not ready:
-        raise AppError("Các video kienthuc hiện có đều đã đăng hoặc đã hẹn.")
-    try:
-        info = fb.check(page, token, version)
-    except fb.FbError as e:
-        raise AppError(str(e)) from e
-    cfg = fb.load_config()
-    done: list[str] = []
-    fails: list[tuple[str, str]] = []
-    for index, (video, when, caption, _source) in enumerate(ready):
-        progress(0.05 + 0.9 * index / len(ready),
-                 desc=(f"Đang đăng {video.name}…"
-                       if when is None else f"Đang hẹn {video.name} — {when:%d/%m %H:%M}…"))
-        try:
-            res = fb.upload_reel(page, token, video, caption, when, version, cfg)
-            fb.mark_posted(str(video), res.get("id", ""), when)
-            done.append(("ngay" if when is None else f"{when:%d/%m %H:%M}")
-                         + f" · `{video.name}`")
-        except fb.FbError as e:
-            fails.append((video.name, str(e)))
-    msg = f"✅ Đã xử lý **{len(done)}/{len(ready)}** Reel trên **{info.get('name')}**."
-    if done:
-        msg += "\n\n" + "\n".join(f"- {item}" for item in done)
-    if fails:
-        msg += "\n\n❌ Không hẹn được:\n\n" + "\n".join(
-            f"- `{name}`: {error}" for name, error in fails)
-    msg += "\n\nCaption dùng phương án 1: ngắn gọn, đi thẳng vào ý."
-    return msg
-
-def on_fb_edit_rows(videos, pattern, current, reset_times=False, shared=None, tags=""):
-    """Mỗi video một hàng; giữ bản sửa khi thêm/bỏ video khỏi danh sách.
-
-    Caption trong bảng chính là bản sẽ đăng nên gắn luôn khối hashtag chung vào
-    đây: trước kia tag chỉ được thêm lúc gửi nên bảng nháp trông như không có tag.
-    """
-    vids = [v for v in (videos or []) if v and Path(v).is_file()]
-    old = {r[0]: r for r in (current or []) if len(r) == 3}
-    plan = _fb_plan(len(vids), pattern) if vids else []
-    if len(plan) < len(vids):
-        raise AppError("Không xếp đủ giờ trống trong 90 ngày tới.")
-    rows = []
-    for video, when in zip(vids, plan):
-        name = Path(video).name
-        prev = old.get(name)
-        text = prev[2] if prev else _fb_caption_for(video)[0]
-        if shared is not None:
-            text = shared.strip() if shared.strip() else _fb_caption_for(video)[0]
-        if text.strip():
-            text = fb.append_tags(text, tags)
-        stamp = prev[1] if prev and not reset_times else when.strftime("%d/%m/%Y %H:%M")
-        rows.append([name, stamp, text])
-    return {'value': rows}
-
-def on_fb_batch_schedule(videos, pattern, caption, tags, edits=None, progress=_noop_progress):
-    """Hẹn giờ hàng loạt: mỗi video một mốc giờ trống kế tiếp, caption tự soạn theo bài gốc."""
-    page, token, version = _fb_creds("", "", "")
-    if not page or not token:
-        raise AppError("Chưa có Page ID/token.\n\n" + _fb_env_note())
-    vids = [v for v in (videos or []) if v and Path(v).is_file()]
-    if not vids:
-        raise AppError("Chưa tích video nào. Tích ở danh sách **1. Video cần đăng** trước đã.")
-    tags = (tags or "").strip()
-    fb.save_config(version=version, hashtags=tags)
-    plan = _fb_plan(len(vids), pattern)
-    if len(plan) < len(vids):
-        raise AppError("Không xếp đủ giờ trống trong 90 ngày tới. Chọn ít video hơn.")
-    # Chốt và kiểm tra toàn bộ hàng trước khi gọi Facebook.
-    by_name = {r[0]: r for r in (edits or []) if len(r) == 3}
-    ready = []
-    for video, when in zip(vids, plan):
-        row = by_name.get(Path(video).name)
-        if edits is not None and row is None:
-            raise AppError("Danh sách video vừa thay đổi. Chờ bảng cập nhật rồi đăng lại.")
-        text = str(row[2] or "").strip() if row else _fb_caption_for(video, tags, caption)[0]
-        if not text:
-            raise AppError(f"{Path(video).name}: hãy điền caption trong hàng của video.")
-        if row:
-            try:
-                when = datetime.strptime(str(row[1]).strip(), "%d/%m/%Y %H:%M")
-            except ValueError as e:
-                raise AppError(f"{Path(video).name}: giờ đăng cần dạng ngày/tháng/năm giờ:phút.") from e
-        if when < datetime.now() + timedelta(minutes=15):
-            raise AppError(f"{Path(video).name}: chọn giờ đăng cách hiện tại ít nhất 15 phút.")
-        ready.append((video, when, text))
-    try:
-        info = fb.check(page, token, version)
-    except fb.FbError as e:
-        raise AppError(str(e)) from e
-
-    cfg = fb.load_config()
-    done: list[str] = []
-    fails: list[tuple[str, str]] = []
-    total = len(vids)
-    for i, (video, when, text) in enumerate(ready):
-        name = Path(video).name
-        progress(0.02 + 0.9 * i / total,
-                 desc=f"Đang hẹn {name} — {when:%d/%m %H:%M} ({i + 1}/{total})…")
-        if not text.strip():
-            fails.append((name, "không có caption và không tìm được bài gốc"))
-            continue
-        try:
-            res = fb.schedule_reel(page, token, video, fb.append_tags(text, tags),
-                                    when, version, cfg)
-            fb.mark_posted(video, res.get("id", ""), when)
-            done.append(f"{when:%d/%m %H:%M} · `{name}`")
-        except fb.FbError as e:
-            fails.append((name, str(e)))
-        except Exception as e:  # noqa: BLE001
-            traceback.print_exc()
-            fails.append((name, str(e)))
-
-    progress(0.94, desc="Đang tải danh sách bài đã hẹn…")
-    try:
-        rows, choices = _fb_rows(page, token, version)
-    except fb.FbError:
-        rows, choices = [], []
-    batch = _fb_batch_choices()
-    msg = f"✅ Đã hẹn **{len(done)}/{total}** Reel lên **{info.get('name')}**."
-    if done:
-        msg += "\n\n" + "\n".join(f"- {d}" for d in done)
-    if fails:
-        msg += f"\n\n❌ {len(fails)} video lỗi:\n\n" + "\n".join(
-            f"- `{n}`: {e}" for n, e in fails)
-    msg += "\n\nFacebook tự đăng đúng giờ — app tắt vẫn chạy. Xem ở **Bài đang chờ đăng**."
-    failed_names = {name for name, _error in fails}
-    remaining = [v for v in vids if Path(v).name in failed_names]
-    return (msg, {'value': rows}, {'choices': choices, 'value': None},
-            {'choices': batch, 'value': remaining},
-            {'value': "Bấm **Đăng lên lịch tất cả** để chốt danh sách vừa hẹn."},
-            on_fb_edit_rows(remaining, pattern, edits, tags=tags))
 
 def _fb_sources() -> list[tuple[str, str]]:
     """Caption sources from scanned Threads posts and prepared regular scripts."""
@@ -734,35 +539,9 @@ def _fb_sources() -> list[tuple[str, str]]:
                     str(f)))
     return out
 
-def _fb_read(src: str | None) -> tuple[dict, Path]:
-    """Read the selected Threads source or regular-video script."""
-    path = Path(src) if src else None
-    if path is None or not path.is_file():
-        rows = _fb_sources()
-        if not rows:
-            raise AppError("Chưa có bài Threads nào — bấm **1. Lấy bài + comment** ở tab "
-                           "Threads trước.")
-        path = Path(rows[0][1])
-    try:
-        if path.name == "kich-ban.txt":
-            return {'post': {'text': path.read_text(encoding='utf-8')}, 'comments': []}, path
-        return json.loads(path.read_text(encoding="utf-8")), path
-    except (OSError, ValueError) as e:
-        raise AppError(f"Không đọc được dữ liệu bài Threads: {e}") from e
-
-def on_fb_gen(src, tags, topic="Tự nhận diện"):
-    """3 bản nháp caption theo skill facebook-reels-caption."""
-    data, path = _fb_read(src)
-    post = data.get("post") or {}
-    extra = [(c.get("text") or "") for c in (data.get("comments") or [])[:3]]
-    content = path.parent.parent.name if path.name == "threads.json" else path.parent.name
-    opts = cap.make_options(post.get("text") or "", content, tags, extra, topic)
-    if not opts:
-        raise AppError("Bài này không có chữ nào để viết caption.")
-    titles = [o["title"] for o in opts]
-    note = "Đã điền bản đầu vào ô soạn. Bấm Lưu caption cho video đã chọn để cập nhật hàng."
-    return (opts, {'choices': titles, 'value': titles[0], 'visible': True},
-            opts[0]["caption"], cap.report(opts[0]), note)
+def on_fb_default_caption(video, tags=""):
+    """Caption mặc định của một video: phương án 1; không có nguồn thì để trống."""
+    return _fb_caption_for(video, tags or "")
 
 def _fb_rows(page, token, version) -> tuple[list[list], list[tuple[str, str]]]:
     items = fb.list_scheduled(page, token, version)
@@ -902,11 +681,8 @@ def on_fb_cancel(page, token, version, post_id):
         rows, choices = _fb_rows(page, token, version)
     except fb.FbError as e:
         raise AppError(str(e)) from e
-    batch = _fb_batch_choices()
     return (f"🗑 Đã huỷ bài `{post_id}`. Video tương ứng đã về lại danh sách chưa đăng.",
-            {'value': rows}, {'choices': choices, 'value': None},
-            {'choices': batch, 'value': []},
-            {'value': []})
+            {'value': rows}, {'choices': choices, 'value': None})
 
 def on_check():
     lines = []

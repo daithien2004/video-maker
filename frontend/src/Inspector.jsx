@@ -31,8 +31,9 @@ export default function Inspector({ settings: s, setSettings, voiceCatalog, setV
       <section><h3><span>03</span> Chữ hiển thị</h3>
         <Field label="Tên font"><input value={s.font} onChange={e => set('font', e.target.value)} /></Field>
         <div className="three-fields">{[['text_color', 'Màu chữ'], ['outline_color', 'Viền chữ'], ['emph_color', 'Nhấn mạnh']].map(([key, label]) => <Field key={key} label={label}><input type="color" value={s[key]} onChange={e => set(key, e.target.value)} /></Field>)}</div>
-        {slider('font_size', 'Cỡ chữ', 60, 200)}{slider('outline_w', 'Độ dày viền', 0, 20)}{slider('text_y', 'Vị trí chữ', 300, 1700)}{slider('max_words', 'Số từ mỗi cụm', 1, 8)}{slider('emph_scale', 'Cỡ nhấn mạnh', 1, 2, .05, '×')}
+        {slider('font_size', 'Cỡ chữ', 60, 200)}{slider('outline_w', 'Độ dày viền', 0, 20)}{slider('text_y', 'Vị trí chữ', 300, 1700)}{slider('max_words', 'Số từ mỗi cụm', 1, 8)}{slider('emph_scale', 'Cỡ nhấn mạnh', 1, 2, .05, '×')}{slider('tier_gap_scale', 'Khe giữa 2 bậc chữ', .6, 1.2, .05, '×')}
         {check('upper', 'Chuyển chữ IN HOA')}{check('pop', 'Hiệu ứng chữ bật lên')}{check('karaoke', 'Tô sáng từng từ khi đọc')}
+        {check('align_subs', 'Phụ đề bám đúng lúc giọng đọc (căn mốc thật, thêm vài giây mỗi nhịp)')}
       </section>
       <section><h3><span>04</span> Khung minh họa</h3><p className="muted small">Flow Threads tự dùng bố cục card riêng khi dựng video.</p>
         {slider('meme_y', 'Vị trí dọc', 0, 800)}{slider('meme_w', 'Chiều rộng', 300, 1080)}{slider('meme_h', 'Chiều cao', 200, 900)}

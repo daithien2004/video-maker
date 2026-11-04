@@ -1,10 +1,10 @@
-"""Sinh caption Facebook Reels theo skill `facebook-reels-caption` (không cần mạng/LLM).
+"""Sinh caption Facebook Reels theo công thức ghi ở docs/DANG_FACEBOOK.md (không cần mạng/LLM).
 
-Skill quy định: hook ≤ ~125 ký tự đứng một mình vẫn hiểu, thân ngắn 2–5 dòng, đúng
+Công thức: hook ≤ ~125 ký tự đứng một mình vẫn hiểu, thân ngắn 2–5 dòng, đúng
 một CTA, hashtag theo bộ mặc định của dự án, kèm 1–2 dòng chữ overlay.
 
 Ở đây chỉ dùng lại chính chữ trong bài gốc — không bịa số liệu, giá, cam kết. Ba phương
-án khác nhau ở cách mở đầu và CTA, đúng định dạng đầu ra của skill.
+án khác nhau ở cách mở đầu và CTA, đúng định dạng đầu ra đã chốt.
 """
 from __future__ import annotations
 
@@ -89,7 +89,13 @@ def detect_topic(text: str, topic: str = "Tự nhận diện") -> str:
     scores = {name: sum(contains_phrase(word) for word in rule[0].split("|"))
               for name, rule in TOPICS.items()}
     best = max(scores, key=scores.get)
-    return best if scores[best] else "Chưa rõ chủ đề"
+    if not scores[best]:
+        return "Chưa rõ chủ đề"
+    # Một lần nhắc ngang ("cứu con chó" trong bài sập cầu) không đủ để gán chủ đề
+    # cho cả bài dài; bài ngắn thì một từ khoá vẫn là chủ đề chính.
+    if scores[best] == 1 and len(units(text)) > 3:
+        return "Chưa rõ chủ đề"
+    return best
 
 
 # --------------------------------------------------------------------------- cắt câu
@@ -184,11 +190,14 @@ def _block(*parts: str) -> str:
 
 
 def make_options(text: str, content: str = "", tags: str = "",
-                 extra: list[str] | None = None, topic: str = "Tự nhận diện") -> list[dict]:
+                 extra: list[str] | None = None, topic: str = "Tự nhận diện",
+                 hook: str = "") -> list[dict]:
     """3 phương án caption theo skill: ngắn gọn · kể chuyện · câu hỏi/tranh luận.
 
     `extra` là các comment nổi bật (nếu bài gốc quá ngắn) để có thêm chất liệu —
     vẫn chỉ dùng chữ có thật trong video, không bịa.
+    `hook` buộc câu mở caption (video thường dùng nhịp mở đầu của kịch bản);
+    bỏ trống thì tự chấm điểm chọn câu như trước.
     """
     def clean(value):
         value = re.sub(r"(?m)^\s*\[[^\]\r\n]+\]\s*", "", value or "")
@@ -196,7 +205,8 @@ def make_options(text: str, content: str = "", tags: str = "",
 
     main = units(clean(text))
     alts = [u for u in units(clean("\n".join(extra or []))) if u not in main]
-    if not main and not alts:
+    forced = shorten(" ".join((hook or "").split())) if (hook or "").strip() else ""
+    if not main and not alts and not forced:
         return []
     detected = detect_topic(text, topic)
     tags_line = hashtags(content, text, tags, topic=topic)
@@ -204,12 +214,16 @@ def make_options(text: str, content: str = "", tags: str = "",
            else "Điều gì trong câu chuyện này khiến bạn chú ý nhất?")
     used: set[int] = set()
 
-    i1 = pick(main) if main else None
-    if i1 is not None:
-        used.add(i1)
-        hook1 = shorten(main[i1])
+    if forced:
+        hook1 = forced
+        used = {i for i, u in enumerate(main) if shorten(u) == forced}
     else:
-        i1, hook1 = None, shorten(alts[0])
+        i1 = pick(main) if main else None
+        if i1 is not None:
+            used.add(i1)
+            hook1 = shorten(main[i1])
+        else:
+            i1, hook1 = None, shorten(alts[0]) if alts else ""
 
     i2 = pick(main, used)
     if i2 is not None:

@@ -346,18 +346,6 @@ input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--primary)
 .publish-preview > video { display: block; width: calc(100% - 36px); height: 360px; object-fit: contain; margin: 18px; background: #131315; }
 .publish-preview > strong { font-size: 13px; display: block; margin: 0 18px 9px; overflow-wrap: anywhere; }
 .publish-preview > p { padding: 0 18px 22px; font-size: 12px; }
-.caption-options { display: flex; gap: 9px; flex-wrap: wrap; }
-.caption-options button { font-size: 12px; color: var(--muted-foreground); border: 1px solid var(--border); border-radius: 6px; background: var(--muted); padding: 10px; }
-.caption-options button.active { color: var(--primary); border-color: var(--primary); background: var(--accent); }
-.batch-panel { max-width: none; }
-.batch-video-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; max-height: 320px; overflow: auto; }
-.batch-video-list label { display: flex; align-items: center; gap: 11px; border: 1px solid var(--border); border-radius: 7px; padding: 13px; font-size: 13px; min-width: 0; }
-.batch-video-list label > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
-.batch-video-list small { font-size: 11px; color: var(--primary); white-space: nowrap; }
-.batch-edits { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 19px; }
-.batch-edits article { background: var(--muted); border: 1px solid var(--border); border-radius: 8px; padding: 18px; display: flex; flex-direction: column; gap: 16px; }
-.batch-edits h3 { font-size: 13px; overflow-wrap: anywhere; display: flex; gap: 11px; }
-.batch-edits h3 > span { color: var(--primary); }
 .section-title { display: flex; align-items: center; justify-content: space-between; gap: 15px; }
 .scheduled-list article { display: flex; align-items: center; justify-content: space-between; padding: 22px 0; gap: 22px; border-top: 1px solid var(--border); }
 .scheduled-list strong { font-size: 14px; color: var(--primary); }
@@ -508,7 +496,6 @@ input[data-slot="input"]:focus-visible, textarea[data-slot="textarea"]:focus-vis
   .toast { left: calc(50% + 35px); max-width: calc(100vw - 125px); }
   .footer > span:nth-child(2), .local-badge { display: none; }
   .library-compact .media-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .batch-video-list, .batch-edits { grid-template-columns: 1fr; }
 }
 @media (max-width: 840px) {
   .layout-preview-grid { grid-template-columns: 1fr; padding: 19px; }

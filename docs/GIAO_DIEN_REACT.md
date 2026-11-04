@@ -9,7 +9,7 @@ trên thanh đầu trang đổi sáng/tối và nhớ lựa chọn trên trình 
 ## Video thường
 
 1. Nhập tên nội dung trùng thư mục minh họa trong `assets/illus/`.
-2. Dán kịch bản đã chuẩn bị hoặc mở file `.txt`. Mỗi dòng theo format `[thẻ] lời đọc || chữ hiển thị`.
+2. Dán kịch bản đã chuẩn bị hoặc mở file `.txt`. Mỗi dòng theo format `[thẻ] lời đọc` — chữ hiển thị tự lấy từ lời đọc (viết hoa, giữ `*nhấn mạnh*`). Chỉ thêm `|| chữ hiển thị` khi hai bên buộc phải khác, ví dụ tên phiên âm (`Ca-xpi` / `CASPI`) hay viết tắt (`*50 KM/H*`).
 3. Bấm **Tạo nhịp và voice** để chia nhịp và tạo giọng từ cùng một bản kịch bản. Lời không đổi dùng lại voice đã có. Khi sửa kịch bản, bấm nút này lại để đồng bộ cả hai trước khi xuất.
 4. **Các nhịp** dùng để sửa chữ hiển thị, media và zoom. Tab **Voice** có nghe từng đoạn, **Nghe liên tục** và **Dừng nghe**. Khi thấy đoạn sai, bấm **Sửa lời đọc**, sửa ngay tại đó rồi **Lưu và tạo lại voice**. Thao tác này cập nhật đúng dòng trong kịch bản tổng và lời đọc của nhịp, chỉ tạo lại âm thanh đoạn vừa sửa, giữ nguyên hình và chữ hiển thị. Có thể **Lưu lời đọc** rồi tạo voice sau. Thêm/xóa hoặc đổi thứ tự dòng thực hiện ở **Kịch bản** rồi bấm **Tạo nhịp và voice** lại. Đổi giọng hoặc tốc độ rồi bấm **Cập nhật voice theo giọng đã chọn**.
 5. Khi đã kiểm tra xong, bấm **Xuất video đẹp**. Video dùng lại voice đã tạo; không cần dựng bản xem thử trước. Thành phẩm xuất hiện trong **Video đã xuất**. Có thể dùng **Xem khung nhịp** để kiểm tra hình riêng.
@@ -27,7 +27,7 @@ kịch bản video thường và tên nội dung vào `work/video-draft.json`; h
 App tự chuyển kịch bản trong cấu hình cũ sang file bản thảo khi mở lại.
 Nút tải bên cạnh tab kịch bản tải bản `.txt` của kịch bản nguồn hiện tại.
 
-Flow AI vẫn là: người dùng đưa bản thô → AI biên tập giọng chia sẻ/cập nhật, tìm và lưu ảnh/meme →
+Flow AI vẫn là: người dùng đưa bản thô → AI biên tập giọng chia sẻ kiến thức, tìm và lưu ảnh thật cho từng nhịp (không dùng meme) →
 bàn giao kịch bản để người dùng kiểm tra và tự làm tiếp. Giao diện không tự viết lại nội dung hay tự render.
 
 ## Threads
@@ -62,6 +62,9 @@ Bài đã scan và bản kịch bản đã lưu của phiên nằm trong `work/t
 **Mở bài** dùng ảnh và dữ liệu có sẵn, không cần lấy bài lại. Không xóa thư mục này khi dọn file
 render tạm.
 
+Chạy flow Threads bằng lệnh (scraper, quy tắc nguyên văn, chia nhịp, chế độ card, render) xem
+[skill làm video Threads](../skills/lam-video-threads/SKILL.md), PHẦN 2.
+
 ## Thư viện và video đã xuất
 
 **Thư viện media** hỗ trợ tìm kiếm, lọc, xem file, tải thêm ảnh/video/nhạc/font và xóa từng file.
@@ -73,10 +76,13 @@ Minh họa được lưu theo nội dung và thẻ, meme theo thẻ cảm xúc. 
 Trong **Kết nối Page**, nhập Page ID và token nếu cần, lưu rồi kiểm tra kết nối.
 Token đã lưu không hiển thị lại trong trình duyệt. Cấu hình từ `work/fb.env` vẫn được sử dụng như trước.
 
-Chọn video, nhập caption hoặc lấy gợi ý từ bài Threads đã lưu, chọn giờ hoặc đăng ngay.
-Với hàng loạt, chọn video, xếp giờ rồi sửa từng caption và mốc giờ trước khi xác nhận gửi.
+Chọn một video, caption tự điền phương án 1 soạn sẵn (sửa lại được), chọn giờ (mặc định 11:30) hoặc
+đăng ngay. App không tự xếp video theo thứ tự file: video nào, ngày nào là do bạn chọn.
 Trong **Bài đang chờ**, tải danh sách từ Page để xem và hủy lịch.
 App không tự gửi lại một tác vụ đăng bài khi gặp lỗi; kiểm tra Page trước khi chủ động thử lại.
+
+Cấu hình Page ID/token bằng biến môi trường hoặc `work/fb.env`, nhịp hẹn giờ mặc định và quy tắc
+caption xem [DANG_FACEBOOK.md](DANG_FACEBOOK.md).
 
 ## Khi đang xử lý
 

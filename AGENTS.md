@@ -18,26 +18,32 @@ cũng có thể thực hiện qua agent/CLI. Media nằm trong `assets/` và `ou
 Chạy kiểm thử bằng `.venv\Scripts\python.exe -m unittest discover -s tests -v`.
 Cấu trúc tối giản: `assets/`, `output/`, `work/`, `config/`, `skills/`, `tools/`, `videomaker/`, `tests/`.
 
+`skills/` chỉ có hai bộ: `lam-video-thuong` (kịch bản + minh hoạ + dựng video thường) và
+`lam-video-threads` (chuẩn hóa comment + scraper + card + render Threads).
+
 ## Video thường (không phải Threads)
 
 Khi người dùng đưa kịch bản thô để làm video, đọc và áp dụng
-[skill tạo kịch bản](skills/tao-kich-ban/SKILL.md), đặc biệt mục "Flow video thường đã chốt".
-Mặc định biên tập theo giọng chia sẻ, cập nhật thông tin; chuẩn hóa format của app;
-tự tìm, tải hoặc chụp ảnh minh họa bằng Playwright và chuẩn bị meme phù hợp.
+[skill làm video thường](skills/lam-video-thuong/SKILL.md) — PHẦN 1, đặc biệt "Ba tầng ưu tiên" và
+"Quy trình viết — 6 bước"
+(CQ → sổ dữ kiện có nhãn → bản đồ nhịp → viết xuôi giọng chia sẻ kiến thức → thử xương sống → cắt nhịp). Mặc định biên tập theo giọng chia sẻ, cập nhật thông tin; chuẩn hóa format của app;
+tự tìm, tải hoặc chụp ảnh minh họa bằng Playwright — **mọi nhịp dùng ảnh thật đúng nội dung đang đọc, không dùng meme**.
 Bàn giao kịch bản cùng media đã lưu sẵn để người dùng kiểm tra rồi tự làm tiếp trong app.
 Dừng ở bước bàn giao; chỉ render preview, xuất video hoặc đăng bài khi người dùng yêu cầu.
+Lệnh "Làm video" (tự chọn sự kiện trong ngày tới mp4) ở PHẦN 2 của cùng skill.
 
 ## Threads
 
 Flow video thường ở trên không thay đổi flow Threads. Với bài/comment Threads, giữ quy tắc riêng
 của flow đó: bám nguyên văn nguồn, chỉ chuẩn hóa cách đọc TTS, không tự sáng tác thêm.
 Khi người dùng dán bản thô comment (`# ...png` + các dòng `|| -`) và muốn đọc thành tiếng,
-đọc [skill chuẩn hóa comment](skills/vn-comment-tts-normalize/SKILL.md) và làm đúng quy trình ở đó.
+đọc [skill làm video Threads](skills/lam-video-threads/SKILL.md) PHẦN 1 và làm đúng quy trình ở đó.
 
 Threads lấy bài/chụp ảnh xong: bản thô được đổ thẳng vào ô Kịch bản (nhãn "BẢN CHỈNH") để người dùng
 sửa trực tiếp, không bắt chọn nguồn/JSON lại. Bản thô nguyên văn vẫn giữ trong card "Bản thô"
 (chỉ đọc, có nút sao chép) để đối chiếu; bấm "Lưu kịch bản" mới ghi bản chỉnh vào session.
 Không tích hợp hoặc tự gọi Claude/LLM; không tự render, không ghi đè nguồn Threads.
-Quy tắc UI nằm ở `docs/GIAO_DIEN_REACT.md`.
+Quy tắc UI nằm ở `docs/GIAO_DIEN_REACT.md`; chạy scraper, chia nhịp, bố cục card và render bằng
+lệnh nằm ở `skills/lam-video-threads/SKILL.md` PHẦN 2.
 Bài đã scan và phiên chỉnh sửa có checkpoint trong `work/threads-script/` (`video-drafts/`, `sessions/`):
 mở lại được sau khi đóng app, không ép scan lại. Giữ thư mục này khi dọn cache.

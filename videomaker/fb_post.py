@@ -177,18 +177,6 @@ def unmark_posted(post_id: str) -> None:
         pass
 
 
-def booked_times() -> set[str]:
-    """Các mốc giờ đã hẹn (dạng `YYYY-MM-DD HH:MM`) để xếp lịch không trùng."""
-    out: set[str] = set()
-    for item in posted_log().values():
-        when = (item or {}).get("when") if isinstance(item, dict) else ""
-        try:
-            out.add(datetime.strptime(when, "%d/%m/%Y %H:%M").strftime("%Y-%m-%d %H:%M"))
-        except (TypeError, ValueError):
-            continue
-    return out
-
-
 def _base(cfg: dict) -> str:
     return (cfg.get("graph_base") or GRAPH).rstrip("/")
 
@@ -458,13 +446,3 @@ def append_tags(caption: str, tags: str) -> str:
     if not add:
         return cap
     return (cap + "\n\n" + " ".join(add)).strip()
-
-
-def describe_video(path: str | Path) -> str:
-    """'video_...mp4 · 126 MB' cho dropdown."""
-    p = Path(path)
-    try:
-        mb = p.stat().st_size / 1e6
-    except OSError:
-        return p.name
-    return f"{p.name} · {mb:.0f} MB"

@@ -109,7 +109,8 @@ Khi sửa code, dùng `run_dev.bat`. Với script Python khác chạy từ thư 
 
 Video thường: AI lưu `kich-ban.txt`, `SOURCES.txt` và ảnh theo tag bên trong
 `assets/illus/<noi-dung>/`. Người dùng kiểm tra kịch bản rồi tự làm tiếp trong app.
-Meme dùng chung nằm trong `assets/memes/`.
+Meme dùng chung vẫn nằm trong `assets/memes/` và app vẫn chọn được, nhưng quy trình viết video thường
+**không dùng meme nữa** — mỗi nhịp một ảnh thật đúng nội dung đang đọc.
 
 `work/cache/`, `work/job_*/`, `work/preview_*.mp4` và `work/frame_*` là dữ liệu tạm,
 chỉ dọn khi không còn cần và không có tác vụ sử dụng. Các file `work/fb.env`,

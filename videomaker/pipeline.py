@@ -53,6 +53,15 @@ ZOOM_BACK = 2.2   # độ nảy: phóng vọt quá cỡ zoom rồi trở về đ
 BACKEND_VIENEU = "vieneu"
 BACKEND_DUMMY = "dummy"
 
+# Model CTC tiếng Việt dùng để căn mốc từng từ sau khi TTS dựng tiếng.
+ALIGN_MODEL_ID = "nguyenvulebinh/wav2vec2-base-vietnamese-250h"
+_ALIGN_BLANK = 0
+ALIGN_MIN_COVERAGE = 0.75   # tỉ lệ từ lấy được mốc thật; thấp hơn là fallback ước lượng
+ALIGN_MIN_RATE = 6.0        # ký tự/giây: thấp quá nghĩa là mốc dồn hết về một phía
+ALIGN_MAX_RATE = 40.0
+_ALIGN_MODEL = None
+_ALIGN_PROC = None
+
 # Encoder CPU cho bản cuối (và cho lần xuất lại khi NVENC không lấy được VRAM).
 CPU_VENC = ["-c:v", "libx264", "-preset", "medium", "-crf", "18"]
 
@@ -191,7 +200,8 @@ def parse_script(text: str) -> list[Beat]:
             tag, line = m.group(1).strip(), m.group(2).strip()
         if not line:
             continue
-        if "||" in line:
+        auto_display = "||" not in line  # không tách cột: chữ hiển thị lấy đúng câu đọc
+        if not auto_display:
             spoken, display = (p.strip() for p in line.split("||", 1))
             no_sub = display == "-"  # '|| -' = không phụ đề, chỉ TTS đọc + ảnh
             if no_sub:
@@ -200,6 +210,10 @@ def parse_script(text: str) -> list[Beat]:
             spoken = display = line
             no_sub = False
         display = _CUE_RE.sub("", display).strip()  # bỏ thẻ cảm xúc inline như [cười]
+        if auto_display:
+            # Bố cục chữ (cắt hàng, cỡ cụm) do bộ dựng lo, nên câu viết tự nhiên
+            # là đủ; chỉ dấu *nhấn mạnh* là thứ người viết để lại trong câu.
+            display = display.upper()
         display = re.sub(r"\s*[—–]\s*", " ", display).strip()  # gạch ngang dài = khoảng trắng, không phải điểm ngắt
         spoken = spoken.replace("*", "").strip()  # dấu * chỉ dùng cho chữ hiển thị
         if not spoken:
@@ -440,8 +454,68 @@ def _trim_silence(a: np.ndarray, sr: int, thr: float = 0.008, keep: float = 0.04
     return a[s:e]
 
 
+def _silence_spans(a: np.ndarray, sr: int, thr: float = 0.01,
+                   min_len: float = 0.08) -> list[tuple[float, float]]:
+    """Các khoảng lặng bên trong một nhịp đọc, để canh chữ khớp chỗ ngắt hơi của TTS."""
+    hop = max(1, int(sr * 0.01))
+    n = a.size // hop
+    if n == 0:
+        return []
+    rms = np.abs(a[:n * hop].reshape(n, hop)).mean(axis=1)
+    quiet = rms < thr
+    spans: list[tuple[float, float]] = []
+    i = 0
+    while i < n:
+        if quiet[i]:
+            j = i
+            while j < n and quiet[j]:
+                j += 1
+            s, e = i * hop / sr, j * hop / sr
+            if e - s >= min_len:
+                spans.append((s, e))
+            i = j
+        else:
+            i += 1
+    dur = a.size / sr
+    # bỏ khoảng lặng ở hai đầu: đó là đuôi file, không phải chỗ ngắt câu cần canh chữ
+    return [(s, e) for s, e in spans if s > 0.03 and e < dur - 0.12]
+
+
+def _tighten_pauses(a: np.ndarray, sr: int, min_len: float = 0.12,
+                    max_len: float = 0.14) -> np.ndarray:
+    """Rút mọi khoảng lặng bên trong một nhịp xuống tối đa `max_len` giây.
+
+    Chỉ cắt phần câm, giữ nguyên âm thanh hai bên nên không đổi cách đọc; các khoảng
+    dài 0,3–0,5 s của TTS sẽ co còn 0,14 s để giọng không bị rời rạc.
+    """
+    spans = _silence_spans(a, sr, min_len=min_len)
+    if not spans:
+        return a
+    fade = max(1, int(sr * 0.004))
+    parts: list[np.ndarray] = []
+    prev = 0
+    for s, e in spans:
+        si = int(round(s * sr))
+        ei = int(round(e * sr))
+        keep = int(round(min(e - s, max_len) * sr))
+        head = a[prev:si + keep].copy()
+        if head.size > fade:
+            head[-fade:] *= np.linspace(1.0, 0.0, fade, dtype=np.float32)
+        parts.append(head)
+        prev = ei
+    tail = a[prev:].copy()
+    if tail.size > fade:
+        tail[:fade] *= np.linspace(0.0, 1.0, fade, dtype=np.float32)
+    parts.append(tail)
+    return np.concatenate(parts)
+
+
+def voice_cache_key(backend: str, voice: str, speed: float, text: str) -> str:
+    return hashlib.sha1(f"{backend}|{voice}|{speed:.2f}|p2|{text}".encode("utf-8")).hexdigest()[:20]
+
+
 def synth(text: str, backend: str, voice: str, speed: float) -> Path:
-    key = hashlib.sha1(f"{backend}|{voice}|{speed:.2f}|{text}".encode("utf-8")).hexdigest()[:20]
+    key = voice_cache_key(backend, voice, speed, text)
     out = CACHE_DIR / f"{key}.wav"
     if out.exists():
         return out
@@ -455,13 +529,15 @@ def synth(text: str, backend: str, voice: str, speed: float) -> Path:
     if audio.ndim > 1:
         audio = audio.mean(axis=1) if audio.shape[-1] <= 2 else audio.squeeze()
     audio = _trim_silence(audio.squeeze(), sr)
-    raw = CACHE_DIR / f"{key}_raw.wav"
-    sf.write(str(raw), audio, sr)
     if abs(speed - 1.0) > 0.01:
+        raw = CACHE_DIR / f"{key}_raw.wav"
+        sf.write(str(raw), audio, sr)
         run_ffmpeg(["-i", str(raw), "-filter:a", f"atempo={speed:.3f}", str(out)], CACHE_DIR)
         raw.unlink(missing_ok=True)
-    else:
-        raw.replace(out)
+        audio, sr = sf.read(str(out), dtype="float32")
+    # Nén sau khi đổi tốc độ để số giây cắt được đúng như cấu hình.
+    audio = _tighten_pauses(np.asarray(audio, dtype=np.float32).reshape(-1), sr)
+    sf.write(str(out), audio, sr)
     return out
 
 
@@ -494,10 +570,12 @@ class Options:
     nvenc: bool = False
     emph_color: str = "#FF9A1F"   # bậc chữ lớn: nền màu nhấn, viền trắng
     emph_scale: float = 1.4       # bậc nhấn to gấp mấy lần bậc nhỏ
+    tier_gap_scale: float = 0.8   # khe giữa 2 bậc chữ = từng này khoảng dòng tự nhiên
     card_motion: bool = True       # card ảnh nở nhẹ + trôi chậm trong mỗi mục
     karaoke: bool = True           # tô sáng lần lượt từng từ khi đọc (chỉ nhịp có chữ)
     bg_motion: bool = True         # nền phóng chậm suốt video để khung hình không đứng yên
     pop_in: bool = True            # Threads: card nảy vào (pop) khi sang mục mới
+    align_subs: bool = True        # phụ đề bám mốc giọng thật (căn CTC sau khi TTS dựng tiếng)
     sfx: bool = True               # tiếng pop/whoosh ở mỗi lần sang mục
     fps: int = 60                  # khung hình/giây: 60 mượt hơn 30 khi có chuyển động
     mascot: bool = True            # mascot trồi lên từ đáy khung ở nhịp mở đầu (hook)
@@ -679,7 +757,227 @@ def _spoken_weight(word: str) -> int:
     if digits.isdigit():
         # năm 4 chữ số → đọc theo chữ số (4 âm tiết); số lớn → theo chữ số.
         return max(1, len(digits))
+    if "-" in w:
+        # Tên phiên âm tách bằng gạch nối: mỗi mảnh là một âm tiết
+        # ("Rốc-ke-phe-lơ" đọc 4 âm tiết, không phải 1).
+        parts = [p for p in w.split("-") if p]
+        if len(parts) > 1:
+            return max(1, sum(_spoken_weight(p) for p in parts))
     return 1
+
+
+_UNITS = "không một hai ba bốn năm sáu bảy tám chín".split()
+
+
+def _say_tens(n: int) -> str:
+    if n < 10:
+        return _UNITS[n]
+    t, u = divmod(n, 10)
+    if t == 1:
+        return "mười" + ("" if u == 0 else " " + ("lăm" if u == 5 else _UNITS[u]))
+    tail = "" if u == 0 else {1: "mốt", 4: "tư", 5: "lăm"}.get(u, _UNITS[u])
+    return f"{_UNITS[t]} mươi" + ("" if not tail else " " + tail)
+
+
+def _say_int(n: int) -> str:
+    """Đọc số theo kiểu số đếm: 1929 -> 'một nghìn chín trăm hai mươi chín'."""
+    if n < 0:
+        return "âm " + _say_int(-n)
+    if n < 100:
+        return _say_tens(n)
+    if n < 1000:
+        h, r = divmod(n, 100)
+        out = "một trăm" if h == 1 else f"{_UNITS[h]} trăm"
+        if 0 < r < 10:
+            return out + f" linh {_UNITS[r]}"
+        return out + ("" if not r else " " + _say_int(r))
+    for scale, name in ((1_000, "nghìn"), (1_000_000, "triệu"), (1_000_000_000, "tỉ")):
+        if n >= scale:
+            q, r = divmod(n, scale)
+            out = f"{_say_int(q)} {name}"
+            if not r:
+                return out
+            if scale == 1000 and r < 100:
+                return out + (" không trăm" + (f" linh {_UNITS[r]}" if r < 10 else f" {_say_int(r)}"))
+            return out + " " + _say_int(r)
+    return str(n)
+
+
+def _say_number(word: str) -> str:
+    """Viết chữ số thành lời đọc để căn mốc: TTS đọc số, còn aligner chỉ có ký tự."""
+    w = word.strip(_BREAK_CHARS + "\"'()[]…")
+    if re.fullmatch(r"\d{1,3}([.,]\d{3})+", w):        # 1.234.567 = triệu
+        return _say_int(int(re.sub(r"[.,]", "", w)))
+    out = []
+    for part in re.split(r"([/%-])", w):
+        if not part:
+            continue
+        if part == "%":
+            out.append("phần trăm")
+        elif part == "/":
+            out.append("trên")
+        elif part == "-":
+            out.append("đến")
+        elif part.replace(".", "").replace(",", "").isdigit():
+            if re.search(r"[.,]\d", part):
+                a, b = re.split(r"[.,]", part, 1)
+                out.append(_say_int(int(a)) + " phẩy " + " ".join(_UNITS[int(d)] for d in b))
+            else:
+                out.append(_say_int(int(part.replace(",", ""))))
+        else:
+            out.append(part)
+    return " ".join(out)
+
+
+def _said_words(tokens: list[str]) -> list[tuple[str, int]]:
+    """Từ mà aligner sẽ tìm + từ viết thật mà nó thuộc về (một số = nhiều lời đọc)."""
+    said = []
+    for i, t in enumerate(tokens):
+        if _is_number(t):
+            said.extend((w, i) for w in _say_number(t).split())
+        else:
+            said.append((t, i))
+    return said
+
+
+def _align_load():
+    """Nạp model căn mốc tiếng Việt. Luôn chạy CPU vì GPU đang lo phần mã hóa video."""
+    global _ALIGN_MODEL, _ALIGN_PROC
+    if _ALIGN_MODEL is not None:
+        return _ALIGN_MODEL, _ALIGN_PROC
+    import torch
+    from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
+    os.environ.setdefault("HF_HOME", str(APP_DIR / ".cache" / "huggingface"))
+    _ALIGN_PROC = Wav2Vec2Processor.from_pretrained(ALIGN_MODEL_ID)
+    _ALIGN_MODEL = Wav2Vec2ForCTC.from_pretrained(ALIGN_MODEL_ID).eval()
+    torch.set_num_threads(max(1, min(8, (os.cpu_count() or 4))))
+    return _ALIGN_MODEL, _ALIGN_PROC
+
+
+def _align_chars(said: list[tuple[str, int]]) -> tuple[list[int], list[int]]:
+    """Dãy ký hiệu CTC của lời đọc + từ viết thật mà mỗi ký hiệu thuộc về.
+
+    Căn bằng dạng đọc chứ không phải dạng viết: "1929" không có ký tự trong bảng
+    ký hiệu của model, nên phải đưa vào đúng chuỗi TTS đã đọc thành tiếng.
+    """
+    ids, owner = [], []
+    _, proc = _align_load()
+    tok = proc.tokenizer
+    for word, wi in said:
+        for t in tok(word.lower(), add_special_tokens=False).input_ids:
+            sym = tok.convert_ids_to_tokens([int(t)])[0]
+            if int(t) == _ALIGN_BLANK or sym in ("<unk>", "|", "", " "):
+                continue
+            ids.append(int(t))
+            owner.append(wi)
+    return ids, owner
+
+
+def _align_expand(ids: list[int], owner: list[int]) -> tuple[list[int], list[int]]:
+    """Chèn blank giữa hai ký tự lặp để Viterbi phân biệt được 'a a'."""
+    seq, who, prev = [_ALIGN_BLANK], [-1], None
+    for t, w in zip(ids, owner):
+        if t == prev:
+            seq.append(_ALIGN_BLANK)
+            who.append(-1)
+        seq.append(t)
+        who.append(w)
+        prev = t
+    return seq, who
+
+
+def _viterbi(lp: np.ndarray, seq: list[int]) -> list[int]:
+    """Đường đi CTC đơn điệu: mỗi khung hình gắn một trạng thái của `seq`."""
+    T, S = len(lp), len(seq)
+    emit = lp[:, np.asarray(seq)]
+    cost = np.full((T, S), -np.inf)
+    back = np.zeros((T, S), dtype=np.int8)
+    cost[0, 0] = emit[0, 0]
+    for i in range(1, T):
+        adv = np.concatenate([[-np.inf], cost[i - 1, :-1]])
+        go = adv > cost[i - 1]
+        cost[i] = np.where(go, adv, cost[i - 1]) + emit[i]
+        back[i] = go
+    j = int(np.argmax(cost[-1]))
+    states = [0] * T
+    for i in range(T - 1, -1, -1):
+        states[i] = j
+        j -= int(back[i, j])
+    return states
+
+
+def _align_words(audio: np.ndarray, spoken: str, sr: int = 48000) -> list[dict] | None:
+    """Mốc thật của từng từ trong lời đọc một nhịp; None nếu phải dùng ước lượng cũ.
+
+    VieNeu-TTS không trả timestamp theo từ, nên sau khi dựng tiếng xong ta ép
+    model wav2vec2 đọc lại chính file đó và lấy đường đi CTC làm mốc. Một nhịp chỉ
+    vài giây nên CPU đủ nhanh.
+    """
+    tokens = spoken.split()
+    if len(tokens) < 2:
+        return None
+    try:
+        import torch
+        import torchaudio
+        model, proc = _align_load()
+        pcm = np.asarray(audio, dtype=np.float32)
+        if sr != 16000:
+            pcm = torchaudio.functional.resample(torch.from_numpy(pcm.copy()), sr, 16000).numpy()
+        feat = proc.feature_extractor(pcm, sampling_rate=16000, return_tensors="pt")
+        with torch.no_grad():
+            logits = model(feat.input_values).logits[0]
+        lp = torch.log_softmax(logits, dim=-1).numpy().astype(np.float64)
+        ids, owner = _align_chars(_said_words(tokens))
+        if len(ids) < 2:
+            return None
+        seq, who = _align_expand(ids, owner)
+        states = _viterbi(lp, seq)
+        step = len(pcm) / len(states) / 16000
+        spans: dict[int, tuple[int, int]] = {}
+        for frame, st in enumerate(states):
+            w = who[st]
+            if w < 0:
+                continue
+            a0, a1 = spans.get(w, (frame, frame + 1))
+            spans[w] = (min(a0, frame), max(a1, frame + 1))
+        alignable = len(spans)
+        if alignable < 2 or alignable / len(tokens) < ALIGN_MIN_COVERAGE:
+            return None
+        marks = []
+        for wi, word in enumerate(tokens):
+            if wi in spans:
+                s, e = spans[wi]
+                marks.append({"word": word, "start": s * step, "end": (e + 1) * step, "real": True})
+            else:
+                marks.append({"word": word, "start": 0.0, "end": 0.0, "real": False})
+        # Nội suy từ không căn được (chữ số) vào khoảng giữa hai neighbour đã căn.
+        i = 0
+        while i < len(marks):
+            if marks[i]["real"]:
+                i += 1
+                continue
+            j = i
+            while j < len(marks) and not marks[j]["real"]:
+                j += 1
+            left = marks[i - 1]["end"] if i else 0.0
+            right = marks[j]["start"] if j < len(marks) else len(pcm) / 16000
+            share = [max(1, _spoken_weight(m["word"])) for m in marks[i:j]]
+            total = float(sum(share)) or 1.0
+            if right <= left:                # hai neighbour chồng nhau vì mốc lệch
+                right = left + 0.12 * total
+            pos = left
+            for k, m in enumerate(marks[i:j]):
+                width = (right - left) * share[k] / total
+                m["start"], m["end"] = pos, pos + width
+                pos += width
+            i = j
+        voiced = max(m["end"] for m in marks) - min(m["start"] for m in marks)
+        rate = len(ids) / voiced if voiced > 0 else 0.0
+        if not ALIGN_MIN_RATE <= rate <= ALIGN_MAX_RATE:
+            return None
+        return marks
+    except Exception:
+        return None
 
 
 def _can_split(left: str, right: str) -> bool:
@@ -696,6 +994,15 @@ def _can_split(left: str, right: str) -> bool:
     return True
 
 
+def _can_split_at(run: list, index: int) -> bool:
+    """Allow the boundary between a date's day/month and its year."""
+    left, right = run[index - 1][0], run[index][0]
+    if _is_number(left) and _word_key(right) == "năm" and index >= 2:
+        if _word_key(run[index - 2][0]) == "tháng":
+            return True
+    return _can_split(left, right)
+
+
 def _split_run(run: list, max_words: int) -> list[list]:
     """Chia một đoạn (không có dấu câu) thành các cụm đều nhau, tránh cắt giữa cụm từ.
 
@@ -706,34 +1013,61 @@ def _split_run(run: list, max_words: int) -> list[list]:
     """
     if len(run) <= max_words:
         return [run]
-    n = math.ceil(len(run) / max_words)
-    lo = 2 if len(run) >= 5 else 1
-    cuts: list[int] = []
-    for k in range(1, n):
-        ideal = k * len(run) / n
+    if max_words < 2:
+        return [run]
+    memo: dict[int, list[list] | None] = {}
 
-        def key(i: int) -> tuple[float, int]:
-            toggle = run[i - 1][1] != run[i][1]
-            return abs(i - ideal) - (0.6 if toggle else 0.0), -i
+    def solve(start: int) -> list[list] | None:
+        if start == len(run):
+            return []
+        if start in memo:
+            return memo[start]
+        for size in range(min(max_words, len(run) - start), 1, -1):
+            end = start + size
+            if end < len(run) and (
+                not _can_split_at(run, end)
+                or (run[end - 1][1] and run[end][1])
+            ):
+                continue
+            tail = solve(end)
+            if tail is not None:
+                memo[start] = [run[start:end], *tail]
+                return memo[start]
+        memo[start] = None
+        return None
 
-        cands = sorted(range(lo, len(run)), key=key)
-        allowed = [i for i in cands
-                   if all(abs(i - c) >= 2 for c in cuts)
-                   and not (run[i - 1][1] and run[i][1])
-                   and _can_split(run[i - 1][0], run[i][0])]
-        cuts.append(allowed[0] if allowed else int(round(ideal)))
-    cuts = sorted({max(1, min(len(run) - 1, c)) for c in cuts})
-    chunks, prev = [], 0
-    for c in cuts:
-        chunks.append(run[prev:c])
-        prev = c
-    chunks.append(run[prev:])
-    # cụm cuối/đầu chỉ có 1 từ thì gộp sang cụm bên cạnh cho khỏi chớp
-    if max_words > 1 and len(chunks) > 1 and len(chunks[-1]) == 1:
-        chunks[-2].extend(chunks.pop())
-    if max_words > 1 and len(chunks) > 1 and len(chunks[0]) == 1:
-        chunks[1][:0] = chunks.pop(0)
-    return [c for c in chunks if c]
+    chunks = solve(0)
+    if chunks is None:
+        # A long display sentence may not contain enough author-provided
+        # punctuation for every preferred boundary. Keep hard numeric/date
+        # units intact, but still enforce the 2–max_words visual limit.
+        def relaxed(start: int) -> list[list] | None:
+            if start == len(run):
+                return []
+            if start in memo:
+                return memo[start]
+            for size in range(min(max_words, len(run) - start), 1, -1):
+                end = start + size
+                if end < len(run):
+                    left, right = run[end - 1][0], run[end][0]
+                    if ((_is_number(left) and _word_key(right) in _UNIT_WORDS)
+                            or (_is_number(right) and _word_key(left) in {"năm", "tháng"})):
+                        continue
+                tail = relaxed(end)
+                if tail is not None:
+                    memo[start] = [run[start:end], *tail]
+                    return memo[start]
+            memo[start] = None
+            return None
+
+        memo.clear()
+        chunks = relaxed(0)
+    if chunks is None:
+        raise ValueError(
+            f"Không thể chia cụm thành 2–{max_words} từ mà vẫn giữ cụm nghĩa: "
+            f"{' '.join(w for w, _ in run)}"
+        )
+    return chunks
 
 
 def split_items(items: list, max_words: int) -> list[list]:
@@ -757,6 +1091,15 @@ def split_items(items: list, max_words: int) -> list[list]:
     out: list[list] = []
     for run in runs:
         out.extend(_split_run(run, max_words))
+    for i, chunk in enumerate(out):
+        if len(chunk) != 1:
+            continue
+        if i and len(out[i - 1]) > 2:
+            chunk.insert(0, out[i - 1].pop())
+        elif i + 1 < len(out) and len(out[i + 1]) > 2:
+            chunk.append(out[i + 1].pop(0))
+        else:
+            raise ValueError(f"Cụm phụ đề chỉ có 1 từ: {chunk[0][0]}")
     return out
 
 
@@ -768,14 +1111,24 @@ def layout_lines(items: list[tuple[str, bool]], opt: "Options",
                  size: int | None = None) -> list[list[tuple[str, bool]]]:
     """Chia cụm chữ thành các dòng cố định, dùng gần hết bề ngang màn hình.
 
-    `size` là cỡ chữ áp cho cả cụm (cụm nhấn dùng cỡ lớn hơn); bỏ trống thì dùng cỡ gốc.
+    `size` là cỡ chữ áp cho cả cụm (cụm nhấn dùng cỡ lớn hơn); bỏ trống thì mỗi từ
+    mang đúng bậc của nó và khe giữa hai từ khác bậc rộng bằng `_tier_space_width`.
     """
     side = 120 if not getattr(opt, "threads", False) else 40
     avail = W - 2 * side - 2 * opt.outline_w
-    base = int(size or opt.font_size)
-    widths = [_text_width(w, base, opt.font) for w, _ in items]
-    space = _text_width(" ", base, opt.font)
-    total = sum(widths) + space * (len(items) - 1)
+
+    def _w(word: str, big: bool) -> float:
+        base = int(size) if size is not None else _tier_size(opt, big)
+        return _text_width(word, base, opt.font)
+
+    def _gap(big_a: bool, big_b: bool) -> float:
+        if size is not None:
+            return _text_width(" ", int(size), opt.font)
+        return _tier_space_width(_tier_size(opt, big_a), _tier_size(opt, big_b), opt.font)
+
+    widths = [_w(w, e) for w, e in items]
+    gaps = [_gap(items[i][1], items[i + 1][1]) for i in range(len(items) - 1)]
+    total = sum(widths) + sum(gaps)
     n0 = max(1, math.ceil(total / avail))
     for n in range(n0, n0 + 3):
         if n == 1:
@@ -784,24 +1137,47 @@ def layout_lines(items: list[tuple[str, bool]], opt: "Options",
         lines: list[list] = []
         cur: list = []
         curw = 0.0
-        ok = True
-        for it, w in zip(items, widths):
-            add = w + (space if cur else 0)
+        for i, it in enumerate(items):
+            add = widths[i] + (gaps[i - 1] if cur else 0)
             if cur and ((len(lines) < n - 1 and curw + add / 2 > target) or curw + add > avail):
                 lines.append(cur)
-                cur, curw, add = [], 0.0, w
+                cur, curw, add = [], 0.0, widths[i]
             cur.append(it)
             curw += add
         lines.append(cur)
         if len(lines) <= n and all(
-                sum(_text_width(w, base, opt.font) for w, _ in ln)
-                + space * (len(ln) - 1) <= avail for ln in lines):
+                sum(_w(w, e) for w, e in ln)
+                + sum(_gap(ln[k][1], ln[k + 1][1]) for k in range(len(ln) - 1)) <= avail
+                for ln in lines):
             return lines
     return lines
 
 
 def _inline_color(color: str) -> str:
     return "&H" + _ass_color(color)[4:] + "&"
+
+
+def _tier_space_width(size_a: int, size_b: int, font: str) -> float:
+    """Bề ngang model phải đo được của một khe giữa hai chữ khác bậc.
+
+    Dấu cách vốn mang cỡ của chữ đứng trước nó, nên khe giữa một chữ nhỏ (120px)
+    và một chữ to (168px) chỉ rộng bằng dấu cách cỡ nhỏ. Đo trên khung 1080: khe
+    nhỏ–to 17px, trong khi hai chữ to cạnh nhau là 27px — 10px hụt đó là chỗ chữ
+    to dính vào chữ nhỏ. Lấy cỡ lớn hơn trong hai chữ thì khe trở lại đúng dấu
+    cách của bậc to, không phải thêm hằng số px tự đặt.
+    """
+    return _text_width(" ", max(size_a, size_b), font)
+
+
+def _tier_space(size_a: int, size_b: int) -> str:
+    """Một dấu cách giữa hai chữ, luôn mang cỡ của bậc lớn hơn trong hai bậc.
+
+    Chữ trước đã đứng ở cỡ của nó nên dấu cách tự nhiên rộng bằng cỡ đó; chỉ khi
+    chữ sau mới là bậc to thì phải nâng dấu cách lên to, không để nó ăn theo chữ nhỏ.
+    """
+    if size_b <= size_a:
+        return " "
+    return rf"{{\fs{size_b}}} "
 
 
 def _tier_size(opt: "Options", big: bool) -> int:
@@ -902,12 +1278,80 @@ def build_ass(timed: list[dict], opt: Options) -> str:
         chunks = split_items(parse_emph(disp), opt.max_words)
         if not chunks:
             continue
-        weights = [sum(_spoken_weight(w) for w, _ in c) for c in chunks]
-        total_w = float(sum(weights))
-        span = t["text_end"] - t["start"]
-        cur = t["start"]
-        for c, w in zip(chunks, weights):
-            end = cur + span * (w / total_w)
+        # Chữ hiển thị là bản viết hoa của lời đọc (tên phiên âm, đơn vị có thể khác
+        # cách viết nhưng cùng số từ), nên cân theo âm tiết của chính lời đọc:
+        # "ROCKEFELLER" phải tính 4 âm tiết như "Rốc-ke-phe-lơ", không phải 1 từ.
+        flat = [w for c in chunks for w, _ in c]
+        spoken_tokens = str(t.get("spoken") or "").split()
+        if len(spoken_tokens) == len(flat):
+            token_w = [_spoken_weight(w) for w in spoken_tokens]
+        else:
+            token_w = [_spoken_weight(w) for w in flat]
+        it = iter(token_w)
+        weights = [sum(next(it) for _ in c) for c in chunks]
+        total_w = float(sum(weights)) or 1.0
+        dur = float(t.get("dur") or (t["text_end"] - t["start"]))
+        pauses = t.get("pauses") or []
+        speech_total = max(0.05, dur - sum(e - s for s, e in pauses))
+        initial_silence = 0.0
+        if pauses and pauses[0][0] <= 0.02:
+            initial_silence = pauses[0][1]
+
+        def _at(x: float) -> float:
+            """Mốc trong phần nói -> mốc thật, nhảy qua các khoảng lặng đo được của giọng."""
+            off = 0.0
+            for s, e in pauses:
+                if x > s:
+                    off += min(x, e) - s
+            return t["start"] + x + off
+
+        bounds: list[float] = []
+        # Có mốc thật thì bỏ hẳn ước lượng trọng số: ranh giới cụm là lúc từ đầu
+        # cụm được đọc, không còn suy ra từ số từ hay số chữ số.
+        marks = t.get("align")
+        use_marks = bool(marks) and len(marks) == len(flat)
+        if use_marks:
+            pos = 0
+            for chunk in chunks:
+                bounds.append(t["start"] + max(0.0, float(marks[pos]["start"])))
+                pos += len(chunk)
+            aligned_end = t["start"] + max(0.0, float(marks[-1]["end"]))
+        else:
+            cum = 0.0
+            for w in weights:
+                bounds.append(_at(cum) if cum else t["start"] + initial_silence)
+                cum += speech_total * w / total_w
+            aligned_end = None
+        # cụm cuối giữ tới sát nhịp sau để tên ngắn không bị nháy rồi mất,
+        # nhưng không giữ quá lâu sau khi giọng đã dứt: chữ/karaoke sẽ chạy qua khoảng lặng.
+        last_end = min(float(t.get("vis_end") or t["text_end"]),
+                       t["start"] + dur + 0.18)
+        bounds.append(min(last_end, aligned_end) if aligned_end else last_end)
+        # Cụm kết bằng dấu câu thì giọng thường nghỉ ngay đó: dời mốc đổi cụm
+        # tới lúc giọng nói tiếp để chữ không chạy trước lời đọc.
+        # Mốc thật đã nằm ngay chỗ giọng nghỉ rồi nên nhịp có mốc chỉ cần guard đơn điệu.
+        for i in range(1, len(chunks)):
+            prev = bounds[i - 1] + 0.08
+            if use_marks or not _is_break(chunks[i - 1][-1][0]):
+                bounds[i] = max(bounds[i], prev)
+                continue
+            ends = [t["start"] + e for s, e in pauses if t["start"] + e > prev]
+            if ends:
+                snap = min(ends) - 0.02
+                delta = snap - bounds[i]
+                nxt = bounds[i + 1] if i + 1 < len(bounds) else last_end
+                # chỉ dời tới, và chỉ khi khoảng lặng thật sự nằm sát mốc này;
+                # dấu phẩy thêm vào chữ hiển thị có thể không phải chỗ TTS ngắt hơi
+                if 0 < delta <= 0.45 and nxt - snap >= 0.18:
+                    bounds[i] = snap
+            bounds[i] = max(bounds[i], prev)
+        # Vị trí từ đầu mỗi cụm trong dãy lời đọc, để mốc thật tra được theo từ hiển thị.
+        bases, acc = [], 0
+        for c in chunks:
+            bases.append(acc)
+            acc += len(c)
+        for ci, (c, w) in enumerate(zip(chunks, weights)):
+            cur, end = bounds[ci], bounds[ci + 1]
             chunk = _trim_chunk(c)
             if not chunk:
                 cur = end
@@ -920,14 +1364,23 @@ def build_ass(timed: list[dict], opt: Options) -> str:
             y = float(opt.text_y)
             if opt.threads:
                 # Threads: mỗi bậc là một dòng riêng, hiện đúng lúc từ đầu tiên được đọc,
-                # xếp chồng và giữ tới hết cụm (hành vi gốc).
+                # xếp chồng và giữ tới hết cụm (hành vi gốc). Gom nhóm trên cụm chưa
+                # cắt dấu câu để chỉ số từ vẫn khớp với mốc lời đọc.
                 elapsed = 0.0
                 y = float(opt.text_y)
-                groups = list(_tier_groups(chunk))
-                for big, words in groups:
-                    start = cur + (end - cur) * elapsed / sent_total
+                k = 0
+                for big, words in _tier_groups(c):
+                    if use_marks and bases[ci] + k < len(marks):
+                        start = t["start"] + max(0.0, float(marks[bases[ci] + k]["start"]))
+                    else:
+                        start = cur + (end - cur) * elapsed / sent_total
+                    shown = _trim_chunk(words)
+                    k += len(words)
+                    elapsed += sum(_spoken_weight(word) for word, _ in words)
+                    if not shown:
+                        continue
                     size = _tier_size(opt, big)
-                    laid = layout_lines(words, opt, size)
+                    laid = layout_lines(shown, opt, size)
                     if karaoke:
                         text = _karaoke_lines([(big, ln) for ln in laid], end - start, opt)
                     else:
@@ -938,63 +1391,67 @@ def build_ass(timed: list[dict], opt: Options) -> str:
                         f"{{\\an{an}\\q2\\pos({W // 2},{int(round(y))}){pop}}}{text}"
                     )
                     y += len(laid) * _line_advance(size)
-                    elapsed += sum(_spoken_weight(word) for word, _ in words)
             else:
-                # Video thường: một dòng duy nhất, giữ nguyên toàn bộ cụm (không tách
-                # theo thời gian) để nội dung liên kết không bị chẻ; từ nhấn mạnh được
-                # tô kiểu riêng ngay tại chỗ.
-                items = chunk
+                # Video thường: giữ nguyên toàn bộ cụm (không tách theo thời gian) để nội
+                # dung liên kết không bị chẻ, nhưng cắt cụm thành hai hàng ngay tại từ
+                # *nhấn mạnh* đầu tiên — hàng trên là chữ thường, hàng dưới nổ chữ to.
+                # Cắt chứ không gom bậc: trật tự từ trên hình vẫn là trật tự đang đọc.
+                cut = next((i for i, (_, e) in enumerate(chunk) if e), len(chunk))
+                rows = [row for row in (chunk[:cut], chunk[cut:]) if row]
                 fit_opt = opt
-                if items:
-                    side = 120 if not getattr(opt, "threads", False) else 40
-                    avail = W - 2 * side - 2 * opt.outline_w
-                    widths = [_text_width(w, int(opt.font_size * (opt.emph_scale if e else 1)), opt.font)
-                              for w, e in items]
-                    space = _text_width(" ", opt.font_size, opt.font)
-                    total = sum(widths) + space * (len(items) - 1)
-                    if total > avail and total > 0:
-                        scale = avail / total
-                        fit_opt = replace(opt, font_size=max(10, int(opt.font_size * scale)))
-                laid = layout_lines(items, fit_opt, fit_opt.font_size)
-                if karaoke:
-                    weights = [len(w) + 1 for w, _ in items]
-                    total_w = float(sum(weights)) or 1.0
-                    wi = 0
-                    text_lines = []
-                    for ln in laid:
+                avail = W - 240 - 2 * opt.outline_w
+                widest = 0.0
+                for row in rows:
+                    sizes = [_tier_size(opt, e) for _, e in row]
+                    line_w = (sum(_text_width(w, s, opt.font) for (w, _), s in zip(row, sizes))
+                              + sum(_tier_space_width(sizes[i], sizes[i + 1], opt.font)
+                                    for i in range(len(row) - 1)))
+                    widest = max(widest, line_w / avail)
+                if widest > 1:
+                    fit_opt = replace(opt, font_size=max(10, int(opt.font_size / widest)))
+                total_ch = sum(len(w) + 1 for w, _ in chunk) or 1
+                # Mỗi hàng chữ là một Dialogue riêng nên mới đặt được khoảng cách
+                # giữa hai bậc; libass bỏ qua \pos thứ hai trong cùng một sự kiện.
+                laid: list[tuple[str, int, bool, int]] = []
+                chars = 0
+                for ri, row in enumerate(rows):
+                    for li, ln in enumerate(layout_lines(row, fit_opt)):
                         line_str = ""
-                        cur_big = None
-                        for w, e in ln:
-                            if e != cur_big:
-                                line_str += _tier_style(fit_opt, e)
-                                cur_big = e
-                            dur = max(1, round((end - cur) * weights[wi] / total_w * 100))
-                            wi += 1
-                            line_str += f"{{\\kf{dur}}}{w} "
-                        text_lines.append(line_str.rstrip())
-                    text = r"\N".join(text_lines)
-                else:
-                    text_lines = []
-                    for ln in laid:
-                        segs = []
-                        buf = []
                         cur_e = None
-                        for w, e in ln:
-                            if e != cur_e and buf:
-                                segs.append((cur_e, buf))
-                                buf = []
-                            cur_e = e
-                            buf.append(w)
-                        if buf:
-                            segs.append((cur_e, buf))
-                        line_str = " ".join(
-                            _tier_style(fit_opt, e) + " ".join(words) for e, words in segs)
-                        text_lines.append(line_str)
-                    text = r"\N".join(text_lines)
-                lines.append(
-                    f"Dialogue: 0,{_ass_time(cur)},{_ass_time(end)},Main,,0,0,0,,"
-                    f"{{\\an{an}\\q2\\pos({W // 2},{int(round(float(opt.text_y)))}){pop}}}{text}"
-                )
+                        for i, (w, e) in enumerate(ln):
+                            if i:
+                                line_str += _tier_space(_tier_size(fit_opt, ln[i - 1][1]),
+                                                        _tier_size(fit_opt, e))
+                            if e != cur_e:
+                                line_str += _tier_style(fit_opt, e)
+                                cur_e = e
+                            if karaoke:
+                                dur = max(1, round((end - cur) * (len(w) + 1) / total_ch * 100))
+                                line_str += f"{{\\kf{dur}}}{w}"
+                            else:
+                                line_str += w
+                        laid.append((line_str, max(_tier_size(fit_opt, e) for _, e in ln),
+                                     ri > 0 and li == 0, chars))
+                        chars += sum(len(w) + 1 for w, _ in ln)
+                # Khoảng giữa hai hàng cùng bậc = đúng như libass xếp (\N), tức trung
+                # bình cỡ chữ hai hàng. Chỉ khe giữa hai Bậc mới co lại theo
+                # tier_gap_scale: 1 = như dựng cũ, 0.8 = hai bậc sát nhau hơn hẳn.
+                pitches = [
+                    (laid[i - 1][1] + laid[i][1]) / 2
+                    * (float(getattr(opt, "tier_gap_scale", 1.0)) if laid[i][2] else 1.0)
+                    for i in range(1, len(laid))
+                ]
+                # Hàng đáy nằm đúng trục text_y, khối chữ mọc lên trên: khi cụm chuyển
+                # giữa 1 hàng và 2 hàng, hàng chữ to không nhảy lên/xuống, chỉ có hàng
+                # nhỏ hiện thêm phía trên.
+                y = float(opt.text_y) - sum(pitches)
+                for (text, _, _, at_char), pitch in zip(laid, pitches + [0.0]):
+                    start = cur + (end - cur) * at_char / total_ch if karaoke else cur
+                    lines.append(
+                        f"Dialogue: 0,{_ass_time(start)},{_ass_time(end)},Main,,0,0,0,,"
+                        f"{{\\an{an}\\q2\\pos({W // 2},{int(round(y))}){pop}}}{text}"
+                    )
+                    y += pitch
             cur = end
     return "\n".join(lines) + "\n"
 
@@ -1006,10 +1463,10 @@ def _pause_after(text: str) -> float:
     if not t:
         return 0.0
     if t[-1] in ".!?…":
-        return 0.15
+        return 0.16
     if t[-1] in ",;:":
-        return 0.06
-    return 0.0
+        return 0.05
+    return 0.03
 
 
 # --------------------------------------------------------------------------- dựng
@@ -1432,7 +1889,7 @@ def voice_lines(rows: list[list], opt: Options, index: int | None = None,
             items.append({"beat": n + 1, "row": row_index, "text": spoken,
                           "kind": "sfx", "seconds": 0.0, "cached": True, "path": ""})
             continue
-        key = hashlib.sha1(f"{opt.backend}|{opt.voice}|{opt.speed:.2f}|{spoken}".encode("utf-8")).hexdigest()[:20]
+        key = voice_cache_key(opt.backend, opt.voice, opt.speed, spoken)
         cached = (CACHE_DIR / f"{key}.wav").is_file()
         if force:
             (CACHE_DIR / f"{key}.wav").unlink(missing_ok=True)
@@ -1516,7 +1973,8 @@ def render(rows: list[list], opt: Options, preview: bool = False, cb=None) -> Pa
         dur = len(a) / sr
         clip_path = resolve_clip(b.clip, opt.content)
         timed.append({
-            "display": b.display, "start": t, "dur": dur,
+            "display": b.display, "spoken": b.spoken, "start": t, "dur": dur,
+            "pauses": _silence_spans(a, sr),
             "clip": str(clip_path) if clip_path else None,
             "context": b.context,
             'zoom': zoom,
@@ -1532,6 +1990,10 @@ def render(rows: list[list], opt: Options, preview: bool = False, cb=None) -> Pa
         x["vis_start"] = 0.0 if i == 0 else x["start"]
         x["vis_end"] = nxt
         x["text_end"] = x["start"] + x["dur"] + (opt.gap if i + 1 < len(timed) else 0.3)
+    if getattr(opt, "align_subs", False) and any(x["display"] for x in timed):
+        for x, audio in zip(timed, audios):
+            if x["display"]:
+                x["align"] = _align_words(audio, x["spoken"], sr)
 
     # 3) âm thanh ghép
     mix = np.zeros(int(total * sr) + sr, dtype=np.float32)

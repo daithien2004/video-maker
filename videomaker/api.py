@@ -312,11 +312,6 @@ class FacebookRequest(BaseModel):
     when: str = ''
     now: bool = False
     post_id: str = ''
-    videos: list[str] = Field(default_factory=list)
-    pattern: str = '2/ngày'
-    edits: list[list[Any]] | None = None
-    source: str = ''
-    topic: str = 'Tự nhận diện'
 
 
 def create_app() -> FastAPI:
@@ -824,9 +819,6 @@ def create_app() -> FastAPI:
 
     @api.post('/api/facebook/{action}')
     def facebook(action: str, body: FacebookRequest):
-        if action == 'auto-kienthuc':
-            return jobs.submit('facebook-auto-kienthuc',
-                               lambda progress: {'message': actions.on_fb_auto_kienthuc(progress)})
         if action == 'save':
             return {'message': actions.on_fb_save(body.page, body.token, body.version, body.tags)}
         if action == 'check':
@@ -837,31 +829,21 @@ def create_app() -> FastAPI:
                 return {'rows': rows, 'message': note}
             return jobs.submit('facebook-list', listing)
         if action == 'caption':
-            if not body.source:
-                raise HTTPException(400, 'Chọn bài Threads làm nguồn caption.')
-            source = (APP_DIR / body.source).resolve()
-            if (pl.ILLUS_DIR.resolve() not in source.parents
-                    or source.name not in {'threads.json', 'kich-ban.txt'}
-                    or not source.is_file()):
-                raise HTTPException(400, 'Nguồn caption không hợp lệ.')
-            result = actions.on_fb_gen(str(source), body.tags, body.topic)
-            return {'options': result[0]}
-        if action in ('schedule', 'batch-plan', 'batch'):
-            videos = body.videos if action != 'schedule' else [body.video]
-            resolved = [media_path(v) for v in videos]
-            output_root = pl.OUT_DIR.resolve()
-            if not resolved or any(p.suffix.lower() != '.mp4' or output_root not in p.resolve().parents for p in resolved):
+            video = media_path(body.video)
+            if (video.suffix.lower() != '.mp4'
+                    or pl.OUT_DIR.resolve() not in video.resolve().parents):
                 raise HTTPException(400, 'Chọn video MP4 đã xuất trong output.')
-            videos = list(map(str, resolved))
-            if action == 'batch-plan':
-                return {'rows': actions.on_fb_edit_rows(videos, body.pattern, body.edits or [], shared=body.caption if body.caption else None, tags=body.tags)['value']}
-            if action == 'batch':
-                return jobs.submit('facebook-batch', lambda progress: {'message': actions.on_fb_batch_schedule(
-                    videos, body.pattern, body.caption, body.tags, body.edits, progress=progress)[0]})
+            caption, source = actions.on_fb_default_caption(str(video), body.tags)
+            return {'caption': caption, 'source': source}
+        if action == 'schedule':
+            video = media_path(body.video)
+            if (video.suffix.lower() != '.mp4'
+                    or pl.OUT_DIR.resolve() not in video.resolve().parents):
+                raise HTTPException(400, 'Chọn video MP4 đã xuất trong output.')
             if not body.caption.strip():
                 raise HTTPException(400, 'Hãy nhập caption trước khi đăng.')
             def schedule(progress):
-                result = actions.on_fb_schedule(body.page, body.token, body.version, videos[0], '', body.caption,
+                result = actions.on_fb_schedule(body.page, body.token, body.version, str(video), '', body.caption,
                                                 body.tags, body.when, body.now, progress=progress)
                 return {'message': result[0], 'rows': result[1].get('value', [])}
             return jobs.submit('facebook-schedule', schedule)

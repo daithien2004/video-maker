@@ -1,9 +1,19 @@
 ---
-name: vn-comment-tts-normalize
-description: Chuyển bản thô (raw) các comment/bài đăng mạng xã hội tiếng Việt sang bản đã chỉnh để đọc thành tiếng / làm voice-over / làm video (TTS). Converts raw Vietnamese social-media comment transcripts (lines like "# post/04-cmt-xxx.png (comment 3 · @user · 135 like)" followed by text lines ending with "|| -") into a clean, speakable version - expands slang and abbreviations phonetically (vcl → vờ cờ lờ, cmt → còm men, k → không), spells English/app names the Vietnamese way (momo → mô mô, iphone → ai phôn, circle k → xơ cồ cây, pro max → Prô Mắc), rewrites money/unit shorthand (10k → 10 ka, 3c/ng → 3 cái một người), strips emoji and ￼ placeholders, normalizes punctuation and capitalization, replaces laughter/emoji-only comments with [sound], leaves image comments untouched (the app auto-zooms those beats), keeps every comment including off-topic or sensitive ones (removal is the user's own call, never done here), and re-wraps lines. Use whenever the user pastes a raw comment dump in this format, or says "bản thô", "bản đã chỉnh", "chỉnh sửa comment", "viết lại để đọc", "làm script đọc comment", even if they don't mention TTS.
+name: lam-video-threads
+description: Flow video Threads: chuyển bản thô (raw) các comment/bài đăng tiếng Việt (định dạng "# post/xx.png ..." + các dòng lời đọc "|| -") sang bản đã chỉnh để đọc thành tiếng / làm voice-over / dựng video, rồi dựng video từ card Threads. Converts raw Vietnamese social-media comment transcripts into a speakable script (expand teencode and English/app names phonetically, rewrite money/unit shorthand, strip emoji, normalize punctuation, replace laughter-only comments with [sound], re-wrap lines, keep every comment) and covers scraper, card layout and render. Use whenever the user pastes a raw comment dump in this format or says "bản thô", "bản đã chỉnh", "chỉnh sửa comment", "viết lại để đọc", "làm script đọc comment", "làm video Threads", even if they don't mention TTS.
 ---
 
-# Chuẩn hóa comment tiếng Việt để đọc thành tiếng
+# SKILL: Làm video Threads
+
+Video Threads là **bài của người khác đăng trên Threads**: không sáng tác, không tìm ảnh minh
+hoạ, không chèn meme. Skill này gồm hai phần: PHẦN 1 chuẩn hóa lời đọc nguyên văn, PHẦN 2 lấy
+bài - dựng card - dựng video. Kịch bản Threads luôn dùng `|| -` (không phụ đề, chữ nằm trên card).
+
+Luật viết/format chung của video thường (mạch kể, ngân sách âm tiết, chia cụm 2–4 từ) ở
+`skills/lam-video-thuong/SKILL.md`; chỉ áp dụng phần chia nhịp, mọi luật sáng tác nội dung đều
+không áp dụng ở đây.
+
+## PHẦN 1 — CHUẨN HÓA LỜI ĐỌC COMMENT
 
 Biến **bản thô** (copy từ ảnh chụp/OCR comment) thành **bản đã chỉnh**: người đọc/giọng TTS đọc trơn tru, không vấp teencode, không đọc emoji, không đọc nội dung nhạy cảm.
 
@@ -247,3 +257,121 @@ Bản mẫu có vài chỗ không nhất quán; hỏi hoặc ghi chú ở cuối
 
 1. Bản đã chỉnh (khối code, đúng định dạng đầu vào), đầy đủ mọi comment của bản thô.
 2. Một danh sách ngắn **"Cần bạn xác nhận"** (các điểm mơ hồ). Không lặp lại toàn bộ bản thô.
+
+---
+
+## PHẦN 2 — LẤY BÀI, DỰNG CARD VÀ RENDER
+
+Bài/comment Threads là **phát ngôn của người khác**: giữ nguyên văn, chỉ chuẩn hóa cách TTS đọc.
+Không áp dụng quy trình 6 bước và quy tắc tìm ảnh minh hoạ của `skills/lam-video-thuong/SKILL.md`.
+
+## 1. Lấy bài bằng scraper
+
+Playwright headless, không tốn phí:
+
+```powershell
+.\.venv\Scripts\python.exe -m videomaker.threads_shot "<link>" --content <nội-dung> --tag post --top 4
+```
+
+Kết quả trong `assets/illus/<nội-dung>/post/`: `01-post-<handle>.png`, `02-cmt-<handle>.png`…
+(rộng 1080, cao theo nội dung — tối đa 640), `threads.json` (dữ liệu đã bóc) và `script.txt`
+(kịch bản sinh sẵn).
+
+Kịch bản chữ có một mục `# <đường-dẫn-ảnh>   (mô tả)` cho mỗi card, bên dưới là từng nhịp đọc;
+app đọc lại đúng các mục đó (`threads_shot.parse_sections`) nên sửa/thêm/bớt dòng đều được, và cột
+clip của mỗi nhịp luôn là ảnh của mục chứa nó. Không muốn comment nào vào video thì tích ở ô
+**Comment muốn xoá** rồi bấm **🗑 Xoá comment đã chọn**: ảnh của comment đó bị xoá, mục tương ứng
+trong kịch bản chữ bị bỏ (bài gốc luôn giữ, các dòng đã sửa vẫn nguyên).
+
+## 2. Lời đọc nguyên văn
+
+- Lấy `post.text` trước, rồi `comments[].text` theo đúng thứ tự trên trang (comment chính theo thứ tự
+  lướt, reply đứng ngay sau cha).
+- Không viết lại, không thêm câu dẫn, không bỏ câu, không sửa chính tả/viết tắt của tác giả
+  (`ko`, `b hít zô`, `ctrinh`). Chỉ được: chia nhịp, thêm tag, chuyển số viết bằng chữ sang chữ số.
+- Ngày giờ / tuổi bài ("2 giờ", "26 thg 10", "26/10/2026") **đã hiện ở header card** nên không bao giờ
+  đưa vào lời đọc — `card_from_raw` đã lọc bằng `is_dateish()`.
+- Không xếp lại comment theo like: giữ đúng thứ tự Threads hiển thị. Threads dùng danh sách ảo, gỡ
+  card khỏi DOM khi cuộn, nên scraper gom dần qua từng lượt cuộn (`crawl()`; dict giữ thứ tự lần đầu
+  thấy = thứ tự trên trang), không đọc một lần ở cuối trang (làm vậy mất comment ở đầu trang).
+
+## 3. Chia nhịp
+
+- Theo luật chia nhịp ở mục 3 của `skills/lam-video-thuong/SKILL.md` (7–14 từ), nhưng **dùng hàm của app**
+  thay vì tự chia tay: `threads_shot.split_beats()`, `mark_emphasis()`, `build_editable_script()`.
+  Chúng giữ nguyên từng chữ và ưu tiên cắt ở dấu câu / ranh giới ngoặc kép.
+- `threads_shot.parse_sections()` đọc lại bản đã sửa để dựng bảng nhịp.
+
+## 4. Ảnh của nhịp
+
+**Mỗi nhịp dùng đúng ảnh của bài/comment chứa nó** — ghi thẳng tên file vào cột clip:
+`post/01-post-uidasoda.png` cho mọi nhịp của bài gốc, `post/02-cmt-truogg36x.png` cho mọi nhịp của
+comment đó… Đây là ngoại lệ của quy tắc "mỗi ảnh chỉ xuất hiện 1 lần": một ảnh card phải theo suốt
+đoạn văn của nó. Không để trống cột clip (app sẽ bốc ảnh khác) và không chỉ ghi tag trần `[post]`.
+Không tải ảnh minh hoạ thêm, không chèn meme: nội dung là phát ngôn của người khác, hình phải là
+chính post/comment đó.
+
+## 5. Bố cục card
+
+- Card phủ **đủ bề ngang** khung overlay (`meme_w = 1080 − 2×threads_side_margin`; lề mặc định trong app
+  là 108 → card rộng 864 = 80% khung) nên card vuông, dọc hay ngang đều cách mép trái/phải như nhau
+  và không bị cắt nội dung.
+- Chiều cao khung tự nở theo card cao nhất của cảnh (tab Threads tự tính, không còn dùng
+  `threads_max_height`), nên mọi card kết thúc ở cùng một đường đáy chung.
+- Chữ chạy **sát ngay dưới** card: neo **mép trên** tại đáy chung, cách card 0px, không đổi dù card cao
+  thấp hay chữ 1–2 dòng. Card quá cao (dài hơn vùng an toàn) tự thu chiều cao để không tràn khung/chữ.
+- Nhịp không phụ đề (`|| -`) canh **giữa dọc** khung (`THREADS_CARD_CENTER = 768`, tức 40% khung
+  1920) chứ không dính đáy.
+- Trên card, cỡ chữ cố định ~52px (không phóng to khi bài ngắn), header (avatar + ngày) dính mép trên,
+  footer (like/bình luận) dính mép dưới; card không in dòng nguồn/link ở đáy. Bài dài quá 640px mới hạ
+  cỡ chữ, cuối cùng mới cắt bớt.
+
+## 6. Nhấn mạnh `*…*`
+
+Chỉ đánh vào **số liệu** và **chữ tác giả cố ý viết HOA** (`KHÔNG`). Văn nói trên Threads không có
+"từ khoá" đúng nghĩa — bọc từ dài nhất sẽ ra nhấn mạnh vô nghĩa (`*Thực* ra`, `*Vạn* lý trường thành`),
+nên **thà không nhấn còn hơn nhấn bừa**. Đây là ngoại lệ của quy tắc "mỗi nhịp bắt buộc có ≥1 cụm
+nhấn mạnh".
+
+## 7. Chế độ ảnh và danh tính
+
+- `auto` — post có ảnh/clip thì chụp nguyên card của Threads, post chỉ có chữ thì dựng card (cùng rộng
+  1080, cao theo nội dung). `--mode shot|card` để ép.
+- Danh tính trên card (`--ident`): mặc định `avatar` = ảnh đại diện + chữ "Threads" (không lộ tên tài
+  khoản); `full` = avatar + tên; `no-avatar` = ẩn avatar giữ tên; `anon` = ẩn cả hai. Với `avatar`, ảnh
+  chụp cũng bị ẩn link tên trong DOM trước khi chụp (giữ avatar + giờ đăng) nên không lộ tài khoản;
+  `no-avatar`/`anon` thì mọi post tự chuyển sang dựng card.
+- Ảnh chụp bị tối (lớp phủ đăng nhập) hoặc lỗi sẽ tự bỏ và dựng card thay thế.
+- `threads.json` giữ `post.image` + `comments[].image` để đối chiếu; `script.txt` là bản đã gắn đúng ảnh
+  cho từng nhịp.
+
+## 8. Nhịp zoom và nhịp tiếng
+
+- Mỗi mục (bài/comment) có ảnh/clip đính kèm thì app **tự thêm một nhịp `[zoom]`** (kèm nhạc) ở cuối
+  mục đó. Comment chỉ có ảnh/không chữ → một nhịp `[sound] || -` và **chính nhịp đó bật zoom**, không
+  viết thêm `[zoom]` (tiếng sẽ phát hai lần). GIF bỏ qua nhịp zoom.
+- Nút 🗑 Xoá comment ghi `[nozoom]` vào dòng `#` của mục để không sinh nhịp zoom; chỉ có tác dụng sau
+  khi bấm **Lưu kịch bản**. Tắt thủ công từng nhịp: bỏ chip Zoom ở bảng nhịp.
+- Tiếng zoom nằm lẫn trong nhạc videoplayback nên không tách riêng được; đừng sửa file audio.
+
+## 9. Chữ trên video Threads
+
+- Kịch bản Threads luôn `|| -`: **không phụ đề, không karaoke** — người xem đọc đúng card. Luật parity
+  số từ và cụm 2–4 từ của video thường **không áp dụng**; `mark_emphasis()` chỉ bọc số liệu và chữ tác
+  giả cố ý viết HOA. Nhịp `[sound]`/`[zoom]` cũng mang `|| -`.
+
+## 10. Render
+
+- Cùng pipeline với video thường: `opt.threads=True`, `pl.analyze(script, content=...)` →
+  `pl.render(rows, opt, preview=True)`.
+- Preview: `work/preview_<topic>_<YYYYMMDD_HHMMSS>.mp4`; video hoàn chỉnh:
+  `output/<topic>/video_<topic>_<YYYYMMDD_HHMMSS>.mp4`.
+- **Không tự render và không ghi đè nguồn Threads** (`threads.json`, ảnh card đã chụp): chỉ dựng khi
+  người dùng yêu cầu, luôn preview trước. Bản đã chỉnh lưu trong session; checkpoint bài scan và phiên
+  chỉnh ở `work/threads-script/` — giữ lại khi dọn cache.
+
+## 11. Trong app
+
+Lấy bài/chụp ảnh xong, bản thô đổ thẳng vào ô Kịch bản (nhãn "BẢN CHỈNH") để người dùng sửa; bản thô
+nguyên văn vẫn nằm ở card "Bản thô" (chỉ đọc, có nút sao chép) để đối chiếu; bấm **Lưu kịch bản** mới
+ghi bản chỉnh vào session. Không tích hợp LLM vào app. Quy tắc UI: `docs/GIAO_DIEN_REACT.md`.

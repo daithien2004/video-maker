@@ -83,7 +83,7 @@ class RenderTimingTests(unittest.TestCase):
             options = pl.Options(backend=pl.BACKEND_DUMMY, gap=0, meme_w=80, meme_h=80,
                                  nvenc=False, card_motion=False, bg_motion=False,
                                  pop_in=False, mascot=False, next_card=False, sfx=False)
-            expected_duration = pl.LEAD + 3 * 0.22 + pl.TAIL
+            expected_duration = pl.LEAD + 3 * (0.22 + pl._pause_after('sample')) + pl.TAIL
             for requested_fps, preview in ((24, False), (60, False), (60, True)):
                 with self.subTest(fps=requested_fps, preview=preview):
                     path = pl.render(rows, replace(options, fps=requested_fps), preview=preview)

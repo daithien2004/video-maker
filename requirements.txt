@@ -7,3 +7,9 @@ playwright
 fastapi
 uvicorn
 python-multipart
+
+# Tùy chọn: căn mốc phụ đề theo giọng thật (bật/tắt bằng "align_subs").
+# Thiếu ba gói dưới đây thì pipeline tự quay về ước lượng trọng số, không lỗi.
+torch
+torchaudio
+transformers

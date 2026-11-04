@@ -4,6 +4,7 @@ ffmpeg/
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.cache/
 
 # Frontend
 frontend/node_modules/

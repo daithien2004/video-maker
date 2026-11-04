@@ -80,7 +80,7 @@ export default function App() {
         ? { content: drafts.video.content }
         : Object.fromEntries(Object.entries(settings).filter(([key]) =>
           scope === 'threads-layout' ? key.startsWith('threads_') && key !== 'threads_scrape'
-            : scope === 'video-layout' ? ['meme_y', 'meme_w', 'meme_h', 'bg', 'font', 'font_size', 'text_color', 'outline_color', 'outline_w', 'text_y', 'emph_color', 'emph_scale', 'max_words', 'pop', 'upper'].includes(key)
+            : scope === 'video-layout' ? ['meme_y', 'meme_w', 'meme_h', 'bg', 'font', 'font_size', 'text_color', 'outline_color', 'outline_w', 'text_y', 'emph_color', 'emph_scale', 'tier_gap_scale', 'max_words', 'pop', 'upper'].includes(key)
               : key !== 'content' && key !== 'script' && !key.startsWith('threads_')))
       if (scope === 'script') await request('/video-draft', { script: drafts.video.script, settings: updates })
       else await request('/settings', { settings: updates })
