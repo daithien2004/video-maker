@@ -42,6 +42,15 @@ class ScriptDraftTests(unittest.TestCase):
         self.assertTrue(any("nhịp 4 quá dài" in w for w in warns))
         self.assertTrue(any("viết tắt" in w and "đc" in w for w in warns))
 
+    def test_label_beats_skip_the_caption_syllable_budget(self):
+        long_text = "một câu giải thích dài " * 4 + "và một câu thứ hai nữa."
+        rows = [[1, "mở đầu bằng một câu kể đủ chủ ngữ vị ngữ.", "*NHÃN* MỞ ĐẦU", "", "x", ""],
+                [2, long_text, "*NHÃN* GIẢI THÍCH", "", "x", ""],
+                [3, "kết lại bằng một câu khép ý chính.", "*NHÃN* KẾT", "", "x", ""]]
+        self.assertGreater(sd.speech_syllables(long_text), sd.BEAT_SYLLABLE_BUDGET)
+        warns = sd.lint_rows(rows)
+        self.assertFalse(any("quá dài" in w for w in warns), warns)
+
     def test_uniform_beat_lengths_are_flagged(self):
         warns = sd.rhythm_warnings(self._rows([8, 8, 9, 8, 8]))
         self.assertTrue(any("nhịp 1–5" in w and "cùng độ dài" in w for w in warns), warns)

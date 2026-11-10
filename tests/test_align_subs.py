@@ -107,7 +107,7 @@ class TierLineTests(unittest.TestCase):
         return [ln for ln in pl.build_ass([row], opt).splitlines() if ln.startswith("Dialogue:")]
 
     def test_emphasis_starts_the_lower_line_and_keeps_word_order(self):
-        self.assertEqual(self._text("NHO *TO* NHO"), ["NHO", "TO NHO"])
+        self.assertEqual(self._text("NHO MOT *TO* NHO"), ["NHO MOT", "TO NHO"])
 
     def test_a_cluster_without_emphasis_stays_on_one_line(self):
         self.assertEqual(self._text("NHO NHO"), ["NHO NHO"])
@@ -116,12 +116,12 @@ class TierLineTests(unittest.TestCase):
         self.assertEqual(self._text("*TO TO*"), ["TO TO"])
 
     def test_karaoke_shows_the_same_words_in_the_same_order(self):
-        self.assertEqual(self._text("NHO *TO* NHO", karaoke=True), ["NHO", "TO NHO"])
+        self.assertEqual(self._text("NHO MOT *TO* NHO", karaoke=True), ["NHO MOT", "TO NHO"])
 
     def test_bottom_row_sits_on_text_y_and_the_block_grows_upward(self):
         """Hàng đáy luôn ở text_y như bản 1 hàng; hàng nhỏ xếp lên trên theo tier_gap_scale."""
-        self.assertEqual(self._ys("NHO *TO* NHO", text_y=880, tier_gap_scale=1.0), [736, 880])
-        self.assertEqual(self._ys("NHO *TO* NHO", text_y=880, tier_gap_scale=0.8), [765, 880])
+        self.assertEqual(self._ys("NHO MOT *TO* NHO", text_y=880, tier_gap_scale=1.0), [736, 880])
+        self.assertEqual(self._ys("NHO MOT *TO* NHO", text_y=880, tier_gap_scale=0.8), [765, 880])
         self.assertEqual(self._ys("NHO NHO", text_y=880), [880])
 
     def test_a_cluster_too_long_still_lands_on_two_rows(self):

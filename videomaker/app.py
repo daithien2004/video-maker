@@ -12,7 +12,6 @@ from pathlib import Path
 
 from . import caption as cap
 from . import comment_manager as cm
-from . import script_draft as sd
 from . import pipeline as pl
 from . import threads_shot as ts
 from . import fb_post as fb
@@ -176,9 +175,6 @@ def on_analyze(script, content):
     msg = f"Đã tách {len(rows)} dòng, gán được clip cho {n_clip} dòng. Sửa bảng bên dưới nếu cần rồi bấm xem thử."
     if n_clip == 0:
         msg += " (Chưa có clip nào khớp thẻ — thêm clip vào tab 'Thư viện' hoặc gõ tên file vào cột cuối.)"
-    warns = sd.lint_rows(rows)
-    if warns:
-        msg += "\n\n⚠️ **Cần rà:** " + "; ".join(warns) + "."
     return rows, msg
 
 # --------------------------------------------------------------------------- Threads
@@ -398,9 +394,6 @@ def on_threads_build(text, state):
         uniq = list(dict.fromkeys(missing))
         msg += (f"\n\n⚠️ {len(missing)} nhịp trỏ tới ảnh không tìm thấy trong "
                 f"`assets/illus/{content}/`: " + ", ".join(f"`{m}`" for m in uniq[:5]))
-    warns = sd.lint_rows(rows)
-    if warns:
-        msg += "\n\n⚠️ **Cần rà:** " + "; ".join(warns) + "."
     cards = [(i["rel"], i["rel"]) for i in res.get("images", [])]
     # bảng nhịp dùng '-' làm ký hiệu 'không phụ đề' -> ô xem thử khung coi như rỗng
     first = (rows[0][2] if rows and rows[0][2] != "-" else "") if rows else ""

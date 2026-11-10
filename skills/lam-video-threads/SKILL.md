@@ -9,9 +9,8 @@ Video Threads là **bài của người khác đăng trên Threads**: không sá
 hoạ, không chèn meme. Skill này gồm hai phần: PHẦN 1 chuẩn hóa lời đọc nguyên văn, PHẦN 2 lấy
 bài - dựng card - dựng video. Kịch bản Threads luôn dùng `|| -` (không phụ đề, chữ nằm trên card).
 
-Luật viết/format chung của video thường (mạch kể, ngân sách âm tiết, chia cụm 2–4 từ) ở
-`skills/lam-video-thuong/SKILL.md`; chỉ áp dụng phần chia nhịp, mọi luật sáng tác nội dung đều
-không áp dụng ở đây.
+Flow video thường (`skills/lam-video-thuong/SKILL.md`) là flow riêng, tự viết kịch bản; mọi luật sáng
+tác nội dung của nó không áp dụng ở đây.
 
 ## PHẦN 1 — CHUẨN HÓA LỜI ĐỌC COMMENT
 
@@ -263,7 +262,7 @@ Bản mẫu có vài chỗ không nhất quán; hỏi hoặc ghi chú ở cuối
 ## PHẦN 2 — LẤY BÀI, DỰNG CARD VÀ RENDER
 
 Bài/comment Threads là **phát ngôn của người khác**: giữ nguyên văn, chỉ chuẩn hóa cách TTS đọc.
-Không áp dụng quy trình 6 bước và quy tắc tìm ảnh minh hoạ của `skills/lam-video-thuong/SKILL.md`.
+Không áp dụng quy trình viết và quy tắc tìm ảnh minh hoạ của `skills/lam-video-thuong/SKILL.md`.
 
 ## 1. Lấy bài bằng scraper
 
@@ -297,7 +296,7 @@ trong kịch bản chữ bị bỏ (bài gốc luôn giữ, các dòng đã sử
 
 ## 3. Chia nhịp
 
-- Theo luật chia nhịp ở mục 3 của `skills/lam-video-thuong/SKILL.md` (7–14 từ), nhưng **dùng hàm của app**
+- Mỗi nhịp khoảng 7–14 từ, cắt ở dấu câu; **dùng hàm của app**
   thay vì tự chia tay: `threads_shot.split_beats()`, `mark_emphasis()`, `build_editable_script()`.
   Chúng giữ nguyên từng chữ và ưu tiên cắt ở dấu câu / ranh giới ngoặc kép.
 - `threads_shot.parse_sections()` đọc lại bản đã sửa để dựng bảng nhịp.

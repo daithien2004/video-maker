@@ -13,3 +13,8 @@ python-multipart
 torch
 torchaudio
 transformers
+
+# Tùy chọn: biết từ ghép để không cắt giữa cụm khi chia phụ đề.
+# Thiếu thì chỉ còn assets/tu-ghep.txt; pipeline vẫn chạy.
+pyvi
+underthesea

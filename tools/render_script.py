@@ -21,6 +21,7 @@ def main():
     parser.add_argument("--speed", type=float, default=None, help="tốc độ đọc (ghi đè settings.json)")
     parser.add_argument("--no-align", action="store_true",
                         help="tắt căn mốc giọng thật, dùng ước lượng trọng số cũ")
+    parser.add_argument("--lint", action="store_true", help="in cảnh báo máy kiểm (mặc định tắt)")
     args = parser.parse_args()
 
     cfg = app.load_settings()
@@ -38,8 +39,9 @@ def main():
 
     script = Path(args.script).read_text(encoding="utf-8")
     rows = pl.analyze(script, content=cfg.get("content", ""))
-    for w in sd.lint_rows(rows):
-        print(f"⚠ {w}")
+    if args.lint:
+        for w in sd.lint_rows(rows, cfg.get("content", "")):
+            print(f"⚠ {w}")
     out = pl.render(rows, opt, preview=args.preview)
     print(out)
 

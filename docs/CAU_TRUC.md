@@ -37,19 +37,33 @@ VideoMaker/
 ├── tools/
 │   ├── dev.py             Theo dõi code, build React và khởi động lại app
 │   ├── check_react_ui.py  Kiểm tra giao diện bằng Playwright
-│   └── profile_render.py  Đo mẫu dựng ngắn, không tạo TTS hay video thành phẩm
+│   ├── profile_render.py  Đo mẫu dựng ngắn, không tạo TTS hay video thành phẩm
+│   ├── render_script.py   Dựng preview/video từ file kịch bản (flow "Làm video")
+│   ├── tai_anh.py         Tìm và chọn ảnh Wikimedia Commons, ghi nguồn + giấy phép
+│   └── kiem_video.py      Tự kiểm video vừa dựng: ảnh, phụ đề, độ dài
 ├── skills/                Hướng dẫn làm việc cho AI
 ├── assets/
 │   ├── backgrounds/       Video nền
 │   ├── illus/             Minh họa và kịch bản, chia theo chủ đề
 │   ├── memes/             Meme dùng chung và catalog
 │   ├── fonts/             Font tùy chọn
-│   └── music/             Nhạc nền
+│   ├── music/             Nhạc nền
+│   ├── voices/            Giọng mẫu để clone (`giong-mau.wav`, chỉ có ở máy, không đưa lên git)
+│   ├── references/        Video/âm thanh tham khảo (chỉ có ở máy, không đưa lên git)
+│   └── phat-am.txt        Tên viết = cách đọc cho TTS (vd Schabowski = Sa-bốp-xki)
 ├── output/                Video xuất xong và metadata đi kèm
 ├── work/                  File tạm và trạng thái vận hành
 ├── ffmpeg/                FFmpeg, FFprobe, FFplay và tài liệu đi kèm
 └── .venv/                 Môi trường Python
 ```
+
+## Flow "Làm video" (video thường)
+
+Ra lệnh "Làm video": AI viết kịch bản `assets/illus/<nội-dung>/kich-ban.txt`, tải ảnh bằng `tools/tai_anh.py`,
+dựng preview bằng `tools/render_script.py` rồi tự kiểm bằng `tools/kiem_video.py`. Chi tiết ở
+`skills/lam-video-thuong/SKILL.md`. Giọng: nếu `voice` trong `config/settings.json` là đường dẫn `.wav`
+(vd `assets/voices/giong-mau.wav`) thì clone từ file đó, thiếu file thì dùng giọng mặc định. Cấu hình giọng
+đã chốt: `speed` 1.0; ngắt nghỉ và tốc độ từng câu là các hằng số `CLAUSE_*` đầu `videomaker/pipeline.py`.
 
 ## Cách chạy
 
@@ -107,7 +121,8 @@ Khi sửa code, dùng `run_dev.bat`. Với script Python khác chạy từ thư 
 
 ## Nơi lưu dữ liệu
 
-Video thường: AI lưu `kich-ban.txt`, `SOURCES.txt` và ảnh theo tag bên trong
+Video thường: AI lưu `kich-ban.txt`, `SOURCES.txt`, `ten-rieng.txt` (mỗi dòng một tên riêng,
+bộ dựng tách mỗi tên thành một cụm chữ riêng) và ảnh theo tag bên trong
 `assets/illus/<noi-dung>/`. Người dùng kiểm tra kịch bản rồi tự làm tiếp trong app.
 Meme dùng chung vẫn nằm trong `assets/memes/` và app vẫn chọn được, nhưng quy trình viết video thường
 **không dùng meme nữa** — mỗi nhịp một ảnh thật đúng nội dung đang đọc.

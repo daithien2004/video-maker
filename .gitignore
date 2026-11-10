@@ -18,6 +18,8 @@ config/settings.json
 # Media nặng, ảnh chụp bài viết
 assets/memes/
 assets/illus/
+assets/voices/
+assets/references/
 
 # Hệ điều hành
 .DS_Store

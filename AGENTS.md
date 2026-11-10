@@ -6,7 +6,7 @@
 - `frontend/`: giao diện React/Vite; `src/` là mã nguồn, `dist/` là bản build Python phục vụ.
 - `config/settings.json`: chỉ cấu hình dựng video; kịch bản video thường và tên nội dung nằm trong file kịch bản tại `assets/illus/<nội-dung>/`.
 - `docs/`: hướng dẫn sử dụng và sơ đồ thư mục.
-- `tests/`: bài kiểm thử; `tools/`: công cụ phát triển.
+- `tests/`: bài kiểm thử; `tools/`: công cụ phát triển và công cụ flow video (`tai_anh.py`, `kiem_video.py`, `render_script.py`).
 - `assets/`: thư viện nền, ảnh, meme, font và nhạc; `output/`: video hoàn chỉnh.
 - `work/`: dữ liệu tạm và trạng thái đăng nhập/đăng bài. Không xóa toàn bộ thư mục này khi dọn cache.
 - Giữ cache voice đã duyệt và checkpoint Threads khi dọn file render cũ.
@@ -23,14 +23,11 @@ Cấu trúc tối giản: `assets/`, `output/`, `work/`, `config/`, `skills/`, `
 
 ## Video thường (không phải Threads)
 
-Khi người dùng đưa kịch bản thô để làm video, đọc và áp dụng
-[skill làm video thường](skills/lam-video-thuong/SKILL.md) — PHẦN 1, đặc biệt "Ba tầng ưu tiên" và
-"Quy trình viết — 6 bước"
-(CQ → sổ dữ kiện có nhãn → bản đồ nhịp → viết xuôi giọng chia sẻ kiến thức → thử xương sống → cắt nhịp). Mặc định biên tập theo giọng chia sẻ, cập nhật thông tin; chuẩn hóa format của app;
-tự tìm, tải hoặc chụp ảnh minh họa bằng Playwright — **mọi nhịp dùng ảnh thật đúng nội dung đang đọc, không dùng meme**.
-Bàn giao kịch bản cùng media đã lưu sẵn để người dùng kiểm tra rồi tự làm tiếp trong app.
-Dừng ở bước bàn giao; chỉ render preview, xuất video hoặc đăng bài khi người dùng yêu cầu.
-Lệnh "Làm video" (tự chọn sự kiện trong ngày tới mp4) ở PHẦN 2 của cùng skill.
+Khi người dùng ra lệnh "Làm video" (hoặc đưa đề tài/kịch bản thô), đọc và làm đúng
+[skill làm video thường](skills/lam-video-thuong/SKILL.md): AI tự viết kịch bản ngắn (25–35 giây), tự tải ảnh thật bằng
+`tools/tai_anh.py` (phải xem ảnh trước khi gán; ảnh đầu = ảnh cuối), dựng preview bằng `tools/render_script.py`
+và tự kiểm bằng `tools/kiem_video.py`. Phần dựng (mascot, pop ảnh đầu, phụ đề, giọng, tốc độ) đã chốt, không tự chỉnh.
+Dừng ở preview; chỉ xuất video hoặc đăng bài khi người dùng yêu cầu. Máy kiểm `lint_rows` không còn là cổng.
 
 ## Threads
 

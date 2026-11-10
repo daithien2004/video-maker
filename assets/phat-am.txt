@@ -1,0 +1,2 @@
+# Tên viết trong kịch bản = cách đọc cho TTS. Chữ hiển thị trên video giữ nguyên tên viết.
+Schabowski = Sa-bốp-xki

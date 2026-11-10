@@ -101,31 +101,98 @@ def _has_proper_name(tokens: list[str]) -> bool:
     return any(_is_name(tok, i == 0) for i, tok in enumerate(tokens))
 
 
-def _tier_rows(disp: str) -> list[tuple[list[str], list[str]]]:
-    """Cặp (hàng trên, hàng dưới) của mọi cụm mà bộ dựng sẽ cắt làm hai hàng.
+def _display_chunks(disp: str, content: str = ""):
+    """(items, chunks) đúng như bộ dựng cắt; chunks=None nếu bộ dựng bó tay.
 
-    Dùng lại đúng split_items + parse_emph của pipeline nên cảnh báo khớp với chữ
-    thật sự lên hình, không khớp với cách người viết tưởng cụm sẽ bị cắt.
+    Truyền `content` để đọc cả tên riêng lẫn từ ghép riêng của nội dung — thiếu
+    tham số này là cảnh báo đo trên một cách cắt khác với chữ thật lên hình.
     """
     from . import pipeline as pl
 
+    items = pl.parse_emph(" ".join(disp.upper().split()))
+    names = tuple(pl.load_names(content) or ()) if content else ()
     try:
-        chunks = pl.split_items(pl.parse_emph(" ".join(disp.upper().split())), _CHUNK_MAX_WORDS)
+        chunks = pl.split_items(items, _CHUNK_MAX_WORDS,
+                                pl._name_spans(items, names), content=content)
     except ValueError:
-        return []   # cụm 1 từ: bộ dựng đã báo riêng, không đo tiếp được nữa
+        return items, None
+    return items, chunks
+
+
+def _tier_rows(chunks: list[list]) -> list[tuple[list[str], list[str]]]:
+    """Cặp (hàng trên, hàng dưới) của mọi cụm mà bộ dựng sẽ cắt làm hai hàng."""
+    from . import pipeline as pl
+
     rows = []
     for chunk in chunks:
-        cut = next((i for i, (_, e) in enumerate(chunk) if e), len(chunk))
-        up, dn = chunk[:cut], chunk[cut:]
+        runs = pl._tier_groups(chunk)
+        if len(runs) == 2 and runs[0][0]:
+            up, dn = runs[0][1], runs[1][1]
+        else:
+            cut = next((i for i, (_, e) in enumerate(chunk) if e), len(chunk))
+            up, dn = chunk[:cut], chunk[cut:]
         if up and dn:
             rows.append(([w for w, _ in up], [w for w, _ in dn]))
     return rows
+
+
+def _chunk_warnings(index, items, chunks, content: str = "") -> list[str]:
+    """Cụm chữ hiển thị cắt hỏng: cắt giữa từ ghép, còn đúng 1 từ, kết thúc bằng hư từ.
+
+    Đo trên chính các cụm bộ dựng tạo ra, nên cảnh báo ở đây là thứ người xem thật
+    sự đọc trên hình. Bộ chia cụm đã tránh ba lỗi này khi còn đường chia khác; cảnh
+    báo nổ đúng lúc nó phải phá luật (nhịp tên riêng, câu không có dấu câu).
+    """
+    from . import pipeline as pl, wordseg
+
+    warns: list[str] = []
+    blocked = wordseg.boundaries([w for w, _ in items], content)
+    pos = 0
+    for chunk in chunks[:-1]:
+        pos += len(chunk)
+        # Dấu câu là ranh giới người viết đặt sẵn: cắt ở đó luôn đúng.
+        if pos in blocked and not pl._is_break(items[pos - 1][0]):
+            warns.append(f'nhịp {index}: cụm cắt giữa từ ghép '
+                         f'"{items[pos - 1][0]} {items[pos][0]}"')
+    named = {i for start, end in pl._name_spans(items, tuple(pl.load_names(content) or ())
+                                                if content else ())
+             for i in range(start, end)}
+    pos = 0
+    for chunk in chunks:
+        end = pos + len(chunk)
+        if (len(chunk) == 1 and pos not in named
+                and not (pl._is_connector(chunk[0][0]) and end in named)):
+            warns.append(f'nhịp {index}: cụm chỉ 1 từ "{chunk[0][0]}" — '
+                         "viết lại câu cho cụm dài hơn hoặc thêm dấu câu")
+        elif (len(chunk) > 1 and end < len(items)
+              and pl._is_glue(chunk[-1][0]) and not pl._is_break(chunk[-1][0])):
+            warns.append(f'nhịp {index}: cụm kết thúc bằng hư từ '
+                         f'"{chunk[-1][0]}" — hư từ phải dính với từ theo sau')
+        pos = end
+    return warns
 
 
 def _is_card_script(rows) -> bool:
     """Bài Threads để trống chữ hiển thị (`|| -`). Lời đọc là nguyên văn của người khác
     nên không xét mạch kể — chỉ sửa được cách đọc TTS."""
     return all(str(r[2] or "").strip() in ("", "-") for r in rows if len(r) > 2)
+
+
+def _is_label_row(row) -> bool:
+    """Beat kể có nhãn: chữ hiển thị 3–5 từ và ngắn hơn hẳn lời đọc."""
+    if len(row) < 3:
+        return False
+    disp = " ".join(str(row[2] or "").split())
+    spoken = " ".join(str(row[1] or "").split())
+    if not disp or disp == "-" or not spoken:
+        return False
+    n_disp = len(disp.replace("*", "").split())
+    return 3 <= n_disp <= 5 and n_disp < len(spoken.split())
+
+
+def _label_script(rows) -> bool:
+    rows = [r for r in rows or [] if len(r) > 2 and str(r[1] or "").strip()]
+    return bool(rows) and sum(1 for r in rows if _is_label_row(r)) * 2 >= len(rows)
 
 
 def _beats(rows) -> list[tuple[int, str, list[str]]]:
@@ -166,6 +233,7 @@ def rhythm_warnings(rows) -> list[str]:
     beats = _beats(rows)
     if len(beats) < 3 or _is_card_script(rows):
         return []
+    label_mode = _label_script(rows)
     warns: list[str] = []
 
     for idx, text, _ in beats:
@@ -189,21 +257,23 @@ def rhythm_warnings(rows) -> list[str]:
         )
 
     lengths = [len(tk) for _, _, tk in beats]
-    if not any(n <= _PUNCH_MAX_WORDS for n in lengths):
-        warns.append(
-            f"không nhịp nào ≤{_PUNCH_MAX_WORDS} từ — cả bài cùng cỡ, thiếu cú đấm ở điểm đảo chiều"
-        )
-    start = 0
-    for pos in range(1, len(lengths) + 1):
-        same = pos < len(lengths) and abs(lengths[pos] - lengths[pos - 1]) <= _UNIFORM_TOLERANCE
-        if same:
-            continue
-        if pos - start >= _UNIFORM_RUN:
+    # Beat kể 2–3 câu có nhãn: cỡ beat do câu chuyện quyết, không đo bằng nhịp phụ đề.
+    if not label_mode:
+        if not any(n <= _PUNCH_MAX_WORDS for n in lengths):
             warns.append(
-                f"nhịp {beats[start][0]}–{beats[pos - 1][0]}: {pos - start} nhịp liên tiếp cùng độ dài "
-                f"(±{_UNIFORM_TOLERANCE} từ) — nhịp dài để giải thích, nhịp ngắn để nhấn"
+                f"không nhịp nào ≤{_PUNCH_MAX_WORDS} từ — cả bài cùng cỡ, thiếu cú đấm ở điểm đảo chiều"
             )
-        start = pos
+        start = 0
+        for pos in range(1, len(lengths) + 1):
+            same = pos < len(lengths) and abs(lengths[pos] - lengths[pos - 1]) <= _UNIFORM_TOLERANCE
+            if same:
+                continue
+            if pos - start >= _UNIFORM_RUN:
+                warns.append(
+                    f"nhịp {beats[start][0]}–{beats[pos - 1][0]}: {pos - start} nhịp liên tiếp cùng độ dài "
+                    f"(±{_UNIFORM_TOLERANCE} từ) — nhịp dài để giải thích, nhịp ngắn để nhấn"
+                )
+            start = pos
 
     if not any(len(_NUMBER_RUN.findall(text)) >= 2 for _, text, _ in beats):
         warns.append(
@@ -239,10 +309,15 @@ def load_glossary(path=GLOSSARY_FILE) -> dict:
     return {str(k).lower(): str(v) for k, v in data.items()} if isinstance(data, dict) else {}
 
 
-def lint_rows(rows) -> list[str]:
+def lint_rows(rows, content: str = "") -> list[str]:
     """Cảnh báo nhanh trên bảng nhịp: đại từ treo, giọng văn viết, cỡ nhịp, nhịp quá dài,
     quá nhiều cụm nhấn mạnh trong một nhịp, hai hàng chữ lệch nhau, mốc ngày đè mức mỗi ngày,
-    viết tắt sót trong glossary. Mọi mục đều là cảnh báo — người viết quyết, không chặn dựng."""
+    cụm chữ hiển thị cắt hỏng, viết tắt sót trong glossary. Mọi mục đều là cảnh báo —
+    người viết quyết, không chặn dựng.
+
+    `content` là tên thư mục minh họa: cần để đọc tên riêng + `tu-ghep.txt` riêng của
+    nội dung, nhờ vậy cảnh báo đo đúng cách cắt của bộ dựng.
+    """
     keys = {k for k in (set(_TEENCODE) | set(_ENGLISH) | set(load_glossary())) if len(k) >= 2}
     warnings: list[str] = narrative_warnings(rows) + rhythm_warnings(rows)
     # Bài Threads giữ nguyên văn lời người khác nên không sửa được bố cục chữ hiển thị.
@@ -265,14 +340,22 @@ def lint_rows(rows) -> list[str]:
                 f"— trần là {limit} với nhịp {syl} âm tiết; giữ cụm mang chỗ lệch mới nhất, "
                 "các cụm còn lại để bậc nhỏ"
             )
-        if syl > BEAT_SYLLABLE_BUDGET:
+        if syl > BEAT_SYLLABLE_BUDGET and not _is_label_row(r):
             warnings.append(f"nhịp {index} quá dài ({syl} âm tiết, nên ≤ {BEAT_SYLLABLE_BUDGET})")
         if disp and not card and _POINT_DATE.search(spoken) and _PER_DAY_RATE.search(spoken):
             warnings.append(
                 f"nhịp {index} có cả mốc ngày và mức mỗi ngày — người nghe đọc số thành "
                 f"tổng của riêng ngày đó; mở mốc bằng \"Từ/Sau\" hoặc dời mốc sang nhịp khác"
             )
-        for up, dn in ([] if card else _tier_rows(disp)):
+        items = chunks = None
+        if disp and not card:
+            items, chunks = _display_chunks(disp, content)
+            if chunks is None:
+                warnings.append(f"nhịp {index}: không chia được cụm 2–{_CHUNK_MAX_WORDS} từ "
+                                f"cho \"{disp}\" — ngắt bớt bằng dấu câu")
+        if chunks:
+            warnings.extend(_chunk_warnings(index, items, chunks, content))
+        for up, dn in ([] if not chunks else _tier_rows(chunks)):
             if abs(len(up) - len(dn)) > _ROW_BALANCE_MAX:
                 warnings.append(
                     f"nhịp {index}: hàng trên {len(up)} từ ({' '.join(up)}), hàng dưới "

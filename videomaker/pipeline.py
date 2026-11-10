@@ -45,6 +45,8 @@ AUDIO_EXT = {".mp3", ".wav", ".m4a", ".ogg", ".flac"}
 W, H = 1080, 1920   # khung dọc; fps lấy theo opt.fps (mặc định 60)
 LEAD = 0.25   # giây im lặng đầu video
 GAP = 0.10    # khoảng nghỉ giữa các dòng
+CLAUSE_PAUSE_END = 0.38    # giây nghỉ sau . ! ? giữa hai câu trong một nhịp
+CLAUSE_PAUSE_COMMA = 0.22  # giây tối đa của một khoảng lặng bên trong một câu (phẩy, ngắt cụm)
 TAIL = 0.6    # giây im lặng cuối video
 ZOOM_HOLD = 1.0   # giữ card đã phóng to thêm chút sau tiếng zoom cho kịp nhìn
 ZOOM_IN = 0.18    # thời gian phóng + nảy của nhịp zoom
@@ -250,6 +252,21 @@ def list_contents() -> list[str]:
     if not ILLUS_DIR.is_dir():
         return []
     return sorted(p.name for p in ILLUS_DIR.iterdir() if p.is_dir())
+
+
+def load_names(content: str) -> tuple[str, ...]:
+    """Tên riêng của nội dung: assets/illus/<content>/ten-rieng.txt, mỗi dòng một tên."""
+    if not content:
+        return ()
+    path = ILLUS_DIR / content / "ten-rieng.txt"
+    if not path.is_file():
+        return ()
+    names: list[str] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.split("#", 1)[0].strip()
+        if line:
+            names.append(line)
+    return tuple(dict.fromkeys(names))
 
 
 def scan_illust(content: str) -> dict[str, list[Path]]:
@@ -482,7 +499,7 @@ def _silence_spans(a: np.ndarray, sr: int, thr: float = 0.01,
 
 
 def _tighten_pauses(a: np.ndarray, sr: int, min_len: float = 0.12,
-                    max_len: float = 0.14) -> np.ndarray:
+                    max_len: float = 0.22) -> np.ndarray:
     """Rút mọi khoảng lặng bên trong một nhịp xuống tối đa `max_len` giây.
 
     Chỉ cắt phần câm, giữ nguyên âm thanh hai bên nên không đổi cách đọc; các khoảng
@@ -510,24 +527,115 @@ def _tighten_pauses(a: np.ndarray, sr: int, min_len: float = 0.12,
     return np.concatenate(parts)
 
 
+CLAUSE_RATE = 5.15  # âm tiết/giây mục tiêu của mỗi mệnh đề, trước khi nhân `speed`
+CLAUSE_TAIL_TEMPO = 1.15  # đọc nhanh bao nhiêu lần ở 0,30 s trước mỗi chỗ ngắt (nhanh hơn thì cụm cuối bị dồn)
+
+
+def _even_rate(a: np.ndarray, sr: int, clause: str, tag: str) -> np.ndarray:
+    """Kéo mọi mệnh đề về cùng tốc độ đọc: giọng clone đọc mệnh đề ngắn lúc nhanh lúc chậm
+    (đo 2,3–5,9 âm tiết/giây trong cùng một bài). Mệnh đề dưới 3 âm tiết giữ nguyên."""
+    from .script_draft import speech_syllables
+    syl = speech_syllables(clause)
+    if syl < 3 or a.size < sr * 0.3:
+        return a
+
+    def stretch(x: np.ndarray, tempo: float, name: str) -> np.ndarray:
+        src, dst = CACHE_DIR / f"{tag}_{name}_in.wav", CACHE_DIR / f"{tag}_{name}_out.wav"
+        sf.write(str(src), x, sr)
+        run_ffmpeg(["-i", str(src), "-filter:a", f"atempo={tempo:.3f}", str(dst)], CACHE_DIR)
+        out, _ = sf.read(str(dst), dtype="float32")
+        src.unlink(missing_ok=True)
+        dst.unlink(missing_ok=True)
+        return out.reshape(-1)
+
+    tempo = min(1.4, max(0.8, CLAUSE_RATE * (a.size / sr) / syl))
+    if abs(tempo - 1.0) >= 0.04:
+        a = stretch(a, tempo, "all")
+    # Từ cuối mệnh đề bị TTS kéo dài (0,45–0,55 s cho một âm tiết, gấp 2–3 lần từ thường):
+    # đọc nhanh phần đuôi để cuối câu không chùng xuống.
+    # Làm cả ở trước mỗi chỗ ngắt giữa câu (từ cuối trước dấu phẩy cũng bị kéo dài).
+    if syl >= 4 and a.size > sr * 1.2:
+        win = int(sr * 0.30)
+        ends = [int(s * sr) for s, _ in _silence_spans(a, sr, min_len=0.08)] + [a.size]
+        pieces: list[np.ndarray] = []
+        pos = 0
+        fade = int(sr * 0.006)
+        for k, end in enumerate(ends):
+            start = max(pos, end - win)
+            if end - start < sr * 0.15:
+                continue
+            seg = stretch(a[start:end], CLAUSE_TAIL_TEMPO, f"t{k}")
+            head = a[pos:start].copy()
+            if head.size > fade:
+                head[-fade:] *= np.linspace(1.0, 0.0, fade, dtype=np.float32)
+            if seg.size > fade:
+                seg[:fade] *= np.linspace(0.0, 1.0, fade, dtype=np.float32)
+            pieces += [head, seg]
+            pos = end
+        pieces.append(a[pos:])
+        a = np.concatenate(pieces)
+    return a
+
+
 def voice_cache_key(backend: str, voice: str, speed: float, text: str) -> str:
-    return hashlib.sha1(f"{backend}|{voice}|{speed:.2f}|p2|{text}".encode("utf-8")).hexdigest()[:20]
+    return hashlib.sha1(f"{backend}|{voice}|{speed:.2f}|p14|{text}".encode("utf-8")).hexdigest()[:20]
+
+
+PRONOUNCE_FILE = ASSETS / "phat-am.txt"   # mỗi dòng: Tên viết = cách đọc cho TTS (vd Schabowski = Sa-bốp-xki)
+
+
+def _pronounce(text: str) -> str:
+    """Đổi tên viết trong kịch bản sang cách đọc để TTS đọc đúng; chữ hiển thị giữ nguyên.
+    Mỗi mục là một từ ↔ một từ nên số từ lời đọc không đổi, mốc phụ đề vẫn khớp."""
+    try:
+        lines = PRONOUNCE_FILE.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return text
+    for line in lines:
+        if "=" in line and not line.lstrip().startswith("#"):
+            src, dst = (s.strip() for s in line.split("=", 1))
+            if src:
+                text = re.sub(rf"\b{re.escape(src)}\b", dst, text, flags=re.IGNORECASE)
+    return text
 
 
 def synth(text: str, backend: str, voice: str, speed: float) -> Path:
+    text = _pronounce(text)
     key = voice_cache_key(backend, voice, speed, text)
     out = CACHE_DIR / f"{key}.wav"
     if out.exists():
         return out
     if backend == BACKEND_DUMMY:
         audio, sr = _dummy_audio(text), 48000
+        audio = np.asarray(audio, dtype=np.float32)
     else:
         eng = get_engine(backend)
-        audio = eng.infer(text, voice=voice or None)
         sr = int(eng.sample_rate)
-    audio = np.asarray(audio, dtype=np.float32)
-    if audio.ndim > 1:
-        audio = audio.mean(axis=1) if audio.shape[-1] <= 2 else audio.squeeze()
+        # Đọc từng mệnh đề rồi tự chèn khoảng lặng theo dấu câu: TTS tự ngắt rất thất thường
+        # (nghỉ giữa cụm, không nghỉ ở dấu chấm), nên không tin vào khoảng lặng của nó.
+        parts: list[np.ndarray] = []
+        # "9 tháng 11" TTS đọc chậm hẳn ở cụm này; viết thành chữ thì đọc đều như các từ khác.
+        text = re.sub(r"\b(\d{1,2}) tháng (\d{1,2})\b",
+                      lambda m: f"{_say_int(int(m[1]))} tháng {_say_int(int(m[2]))}", text)
+        # Tách theo CÂU (. ! ? …), không tách ở dấu phẩy: đọc mệnh đề rời thì ngữ điệu bị
+        # ngắt đôi, nghe như nửa câu này ghép với nửa câu khác. Dấu phẩy để model tự ngắt.
+        clauses = [c for c in re.split(r"(?<=[.!?…])\s+", text.strip()) if c]
+        # `voice` là đường dẫn .wav (so với thư mục dự án) thì clone giọng từ file mẫu đó.
+        ref = APP_DIR / voice if voice.lower().endswith(".wav") else None
+        if ref and ref.is_file():
+            kw = {"ref_audio": ref, "temperature": 0.5}
+        else:   # không có file mẫu (máy khác chưa chép) thì dùng giọng mặc định, không lỗi
+            kw = {"voice": None if ref else (voice or None)}
+        for i, clause in enumerate(clauses):
+            a = np.asarray(eng.infer(clause, **kw), dtype=np.float32)
+            if a.ndim > 1:
+                a = a.mean(axis=1) if a.shape[-1] <= 2 else a.squeeze()
+            a = _tighten_pauses(_trim_silence(a.squeeze(), sr), sr, max_len=CLAUSE_PAUSE_COMMA)
+            a = _even_rate(a, sr, clause, f"{key}_c{i}")
+            parts.append(a)
+            if i + 1 < len(clauses):
+                parts.append(np.zeros(int(CLAUSE_PAUSE_END * sr), dtype=np.float32))
+        audio = np.concatenate(parts) if parts else np.zeros(1, dtype=np.float32)
     audio = _trim_silence(audio.squeeze(), sr)
     if abs(speed - 1.0) > 0.01:
         raw = CACHE_DIR / f"{key}_raw.wav"
@@ -536,7 +644,7 @@ def synth(text: str, backend: str, voice: str, speed: float) -> Path:
         raw.unlink(missing_ok=True)
         audio, sr = sf.read(str(out), dtype="float32")
     # Nén sau khi đổi tốc độ để số giây cắt được đúng như cấu hình.
-    audio = _tighten_pauses(np.asarray(audio, dtype=np.float32).reshape(-1), sr)
+    audio = _tighten_pauses(np.asarray(audio, dtype=np.float32).reshape(-1), sr, max_len=0.6)
     sf.write(str(out), audio, sr)
     return out
 
@@ -550,6 +658,7 @@ class Options:
     gap: float = GAP             # giây nghỉ giữa hai nhịp đọc
     bg: str = "ngẫu nhiên"          # "ngẫu nhiên" hoặc tên file trong thư viện nền
     content: str = ""                 # tên nội dung -> thư viện minh họa assets/illus/<content>/
+    names: tuple[str, ...] = ()       # tên riêng (ten-rieng.txt) -> mỗi tên đứng riêng một cụm chữ
     upper: bool = True
     font: str = "Segoe UI Black"
     font_size: int = 120
@@ -706,8 +815,9 @@ _BREAK_CHARS = ",;:.!?…"
 _GLUE_WORDS = {
     "và", "hoặc", "của", "với", "để", "thì", "mà", "là", "nhưng", "nên", "rồi", "trong",
     "từ", "cho", "ở", "khi", "nếu", "vì", "do", "bằng", "theo", "tới", "đến", "cùng",
-    "hay", "còn", "các", "những", "một", "cái", "con", "chiếc", "ông", "bà", "anh", "chị",
-    "cô", "chú", "bác", "ngài", "em", "người", "chúng", "mọi", "tất", "bị", "được",
+    "sang", "tại", "qua",
+    "hay", "còn", "cái", "con", "chiếc", "ông", "bà", "anh", "chị",
+    "cô", "chú", "bác", "ngài", "em", "chúng", "mọi", "tất", "bị", "được",
     "sẽ", "đã", "đang", "vẫn", "cũng", "rất", "quá",
 }
 
@@ -723,6 +833,15 @@ def _is_break(word: str) -> bool:
 
 def _is_glue(word: str) -> bool:
     return word.strip("\"'()“”").rstrip(_BREAK_CHARS).lower() in _GLUE_WORDS
+
+
+# từ nối mở đầu câu: đứng riêng một cụm vẫn đọc được (khác giới từ, phải dính
+# với danh từ theo sau: "sang London", "ở Nam Phi")
+_CONNECTORS = {"nhưng", "và", "hoặc", "rồi", "nên", "thì", "mà", "còn", "hay"}
+
+
+def _is_connector(word: str) -> bool:
+    return _word_key(word) in _CONNECTORS
 
 
 def _is_number(word: str) -> bool:
@@ -913,7 +1032,7 @@ def _align_words(audio: np.ndarray, spoken: str, sr: int = 48000) -> list[dict] 
     model wav2vec2 đọc lại chính file đó và lấy đường đi CTC làm mốc. Một nhịp chỉ
     vài giây nên CPU đủ nhanh.
     """
-    tokens = spoken.split()
+    tokens = _pronounce(spoken).split()
     if len(tokens) < 2:
         return None
     try:
@@ -983,6 +1102,12 @@ def _align_words(audio: np.ndarray, spoken: str, sr: int = 48000) -> list[dict] 
 def _can_split(left: str, right: str) -> bool:
     """Ranh giới này có được phép cắt không (không cắt giữa cụm nghĩa)."""
     a, b = _word_key(left), _word_key(right)
+    try:
+        import videomaker.wordseg as _ws
+        if (a, b) in _ws.compound_pairs((a, b), ""):
+            return False
+    except Exception:
+        pass
     if _is_glue(left):
         return False
     if _is_number(left) and b in _UNIT_WORDS:
@@ -1062,6 +1187,29 @@ def _split_run(run: list, max_words: int) -> list[list]:
 
         memo.clear()
         chunks = relaxed(0)
+        if chunks is None:
+            # Cụm số/ngày cứng đôi khi chỉ có một chỗ cắt hợp nghĩa, và chỗ đó để
+            # lại cụm dài hơn trần ("NGÀY 13 THÁNG 8 NĂM 1961" với trần 3 từ).
+            # Nới đúng một cụm như vậy còn hơn là vỡ cả câu.
+            memo2: dict[int, list[list] | None] = {}
+
+            def stretch(start: int) -> list[list] | None:
+                if start == len(run):
+                    return []
+                if start in memo2:
+                    return memo2[start]
+                for size in range(max_words + 1, len(run) - start + 1):
+                    end = start + size
+                    if end < len(run) and not _can_split_at(run, end):
+                        continue
+                    tail = relaxed(end) or stretch(end)
+                    if tail is not None:
+                        memo2[start] = [run[start:end], *tail]
+                        return memo2[start]
+                memo2[start] = None
+                return None
+
+            chunks = stretch(0)
     if chunks is None:
         raise ValueError(
             f"Không thể chia cụm thành 2–{max_words} từ mà vẫn giữ cụm nghĩa: "
@@ -1070,41 +1218,104 @@ def _split_run(run: list, max_words: int) -> list[list]:
     return chunks
 
 
-def split_items(items: list, max_words: int) -> list[list]:
+def _name_spans(items: list[tuple[str, bool]], names: tuple[str, ...]) -> list[tuple[int, int]]:
+    """Vị trí [đầu, cuối) của từng tên riêng trong chuỗi hiển thị."""
+    if not names:
+        return []
+    keys = [_word_key(w).upper() for w, _ in items]
+    spans: list[tuple[int, int]] = []
+    for name in names:
+        parts = [p.upper() for p in (_word_key(w) for w in name.split()) if p]
+        if not parts:
+            continue
+        size = len(parts)
+        i = 0
+        while i + size <= len(keys):
+            if keys[i:i + size] == parts:
+                spans.append((i, i + size))
+                i += size
+            else:
+                i += 1
+    spans.sort()
+    merged: list[tuple[int, int]] = []
+    for start, end in spans:
+        if merged and start < merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+        else:
+            merged.append((start, end))
+    # Chỉ tách tên khi hai mép là ranh giới nghĩa tự nhiên. Tên đứng sau giới từ
+    # ("ở Nam Phi", "qua Biển Bắc") mà tách ra sẽ bỏ giới từ đứng một mình hoặc
+    # cắt đôi cụm bên cạnh, nên giữ nguyên cụm như cũ. Ngoại lệ đo được: từ nối
+    # mở câu ("Nhưng WINSTON CHURCHILL") đứng riêng được, không nuốt tên.
+    def _left_natural(start: int) -> bool:
+        if start == 0:
+            return True
+        if _can_split(items[start - 1][0], items[start][0]):
+            return True
+        return (_is_connector(items[start - 1][0])
+                and (start == 1 or _is_break(items[start - 2][0])))
+
+    return [
+        (start, end) for start, end in merged
+        if _left_natural(start)
+        and (end == len(items) or _can_split(items[end - 1][0], items[end][0]))
+    ]
+
+
+def split_items(items: list, max_words: int, isolate: list[tuple[int, int]] | None = None, content: str = '') -> list[list]:
     """Chia lời hiển thị thành các cụm hiện dần.
 
     Ưu tiên ngắt sau dấu câu (",", ".", "!"…) nên không cắt vụn giữa cụm từ;
-    đoạn nào quá dài mới chia theo số từ.
+    đoạn nào quá dài mới chia theo số từ. `isolate` là các khoảng tên riêng:
+    mỗi tên đứng thành một cụm riêng, không ghép với từ trước hay sau.
     """
     if not items:
         return []
     max_words = max(1, max_words)
-    runs: list[list] = []
-    cur: list = []
-    for it in items:
-        cur.append(it)
+    spans = [(s, e) for s, e in (isolate or ()) if 0 <= s < e <= len(items)]
+    cuts = {0, len(items)}
+    for i, it in enumerate(items):
         if _is_break(it[0]):
-            runs.append(cur)
-            cur = []
-    if cur:
-        runs.append(cur)
+            cuts.add(i + 1)
+    for start, end in spans:
+        cuts.add(start)
+        cuts.add(end)
+    edges = sorted(cuts)
     out: list[list] = []
-    for run in runs:
-        out.extend(_split_run(run, max_words))
-    for i, chunk in enumerate(out):
-        if len(chunk) != 1:
+    is_name: list[bool] = []
+    for start, end in zip(edges, edges[1:]):
+        seg = items[start:end]
+        if not seg:
             continue
-        if i and len(out[i - 1]) > 2:
+        if any(s <= start and end <= e for s, e in spans):
+            out.append(seg)
+            is_name.append(True)
+        else:
+            chunks = _split_run(seg, max_words)
+            out.extend(chunks)
+            is_name.extend([False] * len(chunks))
+    for i, chunk in enumerate(out):
+        if is_name[i] or len(chunk) != 1:
+            continue
+        # Từ nối mở câu ngay trước một tên riêng ("Nhưng | WINSTON CHURCHILL")
+        # đứng riêng một cụm: ghép ngược vào cụm trước thì cụm đó nuốt từ nối,
+        # ghép xuôi vào tên thì tên hết đứng riêng.
+        if (_is_connector(chunk[0][0]) and i + 1 < len(out) and is_name[i + 1]
+                and (i == 0 or _is_break(out[i - 1][-1][0]))):
+            continue
+        if i and len(out[i - 1]) > 2 and not is_name[i - 1]:
             chunk.insert(0, out[i - 1].pop())
-        elif i + 1 < len(out) and len(out[i + 1]) > 2:
+        elif i + 1 < len(out) and len(out[i + 1]) > 2 and not is_name[i + 1]:
             chunk.append(out[i + 1].pop(0))
+        elif (i and is_name[i - 1]) or (i + 1 < len(out) and is_name[i + 1]):
+            continue
         else:
             raise ValueError(f"Cụm phụ đề chỉ có 1 từ: {chunk[0][0]}")
     return out
 
 
-def split_chunks(text: str, max_words: int) -> list[str]:
-    return [" ".join(w for w, _ in c) for c in split_items(parse_emph(text), max_words)]
+def split_chunks(text: str, max_words: int, content: str = '') -> list[str]:
+    return [" ".join(w for w, _ in c) for c in split_items(parse_emph(text), max_words, content=content)]
 
 
 def layout_lines(items: list[tuple[str, bool]], opt: "Options",
@@ -1126,6 +1337,8 @@ def layout_lines(items: list[tuple[str, bool]], opt: "Options",
             return _text_width(" ", int(size), opt.font)
         return _tier_space_width(_tier_size(opt, big_a), _tier_size(opt, big_b), opt.font)
 
+    if len(items) <= 3:
+        return [items]
     widths = [_w(w, e) for w, e in items]
     gaps = [_gap(items[i][1], items[i + 1][1]) for i in range(len(items) - 1)]
     total = sum(widths) + sum(gaps)
@@ -1275,7 +1488,8 @@ def build_ass(timed: list[dict], opt: Options) -> str:
     for t in timed:
         disp = t["display"].upper() if opt.upper else t["display"]
         disp = disp.replace("{", "(").replace("}", ")").replace("\\", "")
-        chunks = split_items(parse_emph(disp), opt.max_words)
+        items = parse_emph(disp)
+        chunks = split_items(items, opt.max_words, _name_spans(items, tuple(opt.names or ())))
         if not chunks:
             continue
         # Chữ hiển thị là bản viết hoa của lời đọc (tên phiên âm, đơn vị có thể khác
@@ -1350,8 +1564,29 @@ def build_ass(timed: list[dict], opt: Options) -> str:
         for c in chunks:
             bases.append(acc)
             acc += len(c)
+        # Mốc CTC trải đều qua cả khoảng lặng (cuối từ trước chạm đầu từ sau), nên
+        # ranh giới cụm không phải chỗ giọng nghỉ. Video thường lấy khoảng lặng đo được
+        # làm chuẩn: cụm trước tắt trước khoảng lặng, cụm sau hiện khi giọng nói lại —
+        # màn trống giữa hai cụm đúng nhịp video mẫu. Giữ tối thiểu 0,10s để cụm một
+        # từ không nháy. Threads giữ card liền mạch nên vẫn nối cụm như cũ.
+        starts = list(bounds[:-1])
+        ends = list(bounds[1:])
+        if not getattr(opt, "threads", False):
+            abs_pauses = [(t["start"] + s, t["start"] + e) for s, e in pauses]
+            for k in range(1, len(chunks)):
+                b = bounds[k]
+                hit = next(((s, e) for s, e in abs_pauses
+                            if e >= b - 0.02 and s <= b + 0.10 and e - b <= 0.40), None)
+                if not hit:
+                    continue
+                s, e = hit
+                if s > starts[k - 1] + 0.10:
+                    ends[k - 1] = min(ends[k - 1], max(s + 0.04, starts[k - 1] + 0.10))
+                starts[k] = max(b, e)
+            for k in range(len(chunks) - 1):
+                ends[k] = min(max(ends[k], starts[k] + 0.10), starts[k + 1])
         for ci, (c, w) in enumerate(zip(chunks, weights)):
-            cur, end = bounds[ci], bounds[ci + 1]
+            cur, end = starts[ci], ends[ci]
             chunk = _trim_chunk(c)
             if not chunk:
                 cur = end
@@ -1396,8 +1631,21 @@ def build_ass(timed: list[dict], opt: Options) -> str:
                 # dung liên kết không bị chẻ, nhưng cắt cụm thành hai hàng ngay tại từ
                 # *nhấn mạnh* đầu tiên — hàng trên là chữ thường, hàng dưới nổ chữ to.
                 # Cắt chứ không gom bậc: trật tự từ trên hình vẫn là trật tự đang đọc.
-                cut = next((i for i, (_, e) in enumerate(chunk) if e), len(chunk))
-                rows = [row for row in (chunk[:cut], chunk[cut:]) if row]
+                # Cụm chỉ có hai bậc mà bậc nhấn đứng đầu ("*THUYẾT PHỤC* ÔNG NHẬN")
+                # thì cắt tại ranh giới bậc, không dồn cả cụm vào một hàng: dồn lại
+                # buộc bộ dựng thu chữ cho vừa bề ngang, chữ nhấn còn 92 px.
+                runs = _tier_groups(chunk)
+                if len(chunk) <= 3:
+                    rows = [chunk]  # từ 3 chữ trở xuống luôn một hàng; quá rộng thì thu cỡ chữ
+                elif len(runs) == 2 and runs[0][0]:
+                    rows = [words for _, words in runs]
+                else:
+                    cut = next((i for i, (_, e) in enumerate(chunk) if e), len(chunk))
+                    # Tu nhan manh dang sau chi tach 2 hang khi cum co hon 3 tu.
+                    if cut < len(chunk) and len(chunk) <= 3:
+                        rows = [chunk]
+                    else:
+                        rows = [row for row in (chunk[:cut], chunk[cut:]) if row]
                 fit_opt = opt
                 avail = W - 240 - 2 * opt.outline_w
                 widest = 0.0
@@ -1463,10 +1711,10 @@ def _pause_after(text: str) -> float:
     if not t:
         return 0.0
     if t[-1] in ".!?…":
-        return 0.16
+        return 0.30
     if t[-1] in ",;:":
-        return 0.05
-    return 0.03
+        return 0.14
+    return 0.05
 
 
 # --------------------------------------------------------------------------- dựng
@@ -1929,6 +2177,8 @@ def render(rows: list[list], opt: Options, preview: bool = False, cb=None) -> Pa
     cb = cb or (lambda f, m: None)
     if not getattr(opt, "threads", False):
         opt.meme_anchor = "bottom"
+    if opt.content and not opt.names:
+        opt.names = load_names(opt.content)
     rng = random.Random(opt.seed)
 
     beats: list[Beat] = []
@@ -2400,7 +2650,7 @@ def render(rows: list[list], opt: Options, preview: bool = False, cb=None) -> Pa
         cb(0.6 + 0.35 * (pi_ + 1) / len(bounds),
            f"Đang dựng video… (cụm {pi_ + 1}/{len(bounds)})" if len(bounds) > 1
            else ("Đang xuất video…" if not preview else "Đang dựng bản xem thử…"))
-        if len(fg_p) > 200:
+        if True:  # luon 1 luong tran allocate memory
             # Graph nhiều node: mỗi overlay cấp phát buffer theo số luồng filter;
             # các node chủ yếu là overlay bậc thang chỉ đưa ảnh qua nên chạy 1 luồng
             # gần như không mất tốc độ nhưng giảm mạnh RAM commit.

@@ -1,0 +1,16 @@
+# Từ ghép chặn cắt cụm: bộ chia cụm không được ngắt giữa các từ trên cùng một dòng.
+# Mỗi dòng một từ ghép. Chỉ thêm từ cả hai bộ tách từ đều bỏ sót (đã đo), không thêm cụm.
+# File riêng cho một nội dung: assets/illus/<nội-dung>/tu-ghep.txt (đọc thêm, không thay file này).
+
+chuyến đi
+hội đồng lập pháp
+bưu phẩm bảo đảm
+chủ mỏ
+vết cắt
+lương thực
+chung cư
+khởi đầu
+sứ mệnh
+chi tiết
+chuẩn bị
+thiết bị
