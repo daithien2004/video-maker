@@ -578,7 +578,7 @@ def _even_rate(a: np.ndarray, sr: int, clause: str, tag: str) -> np.ndarray:
 
 
 def voice_cache_key(backend: str, voice: str, speed: float, text: str) -> str:
-    return hashlib.sha1(f"{backend}|{voice}|{speed:.2f}|p14|{text}".encode("utf-8")).hexdigest()[:20]
+    return hashlib.sha1(f"{backend}|{voice}|{speed:.2f}|p15|{text}".encode("utf-8")).hexdigest()[:20]
 
 
 PRONOUNCE_FILE = ASSETS / "phat-am.txt"   # mỗi dòng: Tên viết = cách đọc cho TTS (vd Schabowski = Sa-bốp-xki)
@@ -631,7 +631,8 @@ def synth(text: str, backend: str, voice: str, speed: float) -> Path:
             if a.ndim > 1:
                 a = a.mean(axis=1) if a.shape[-1] <= 2 else a.squeeze()
             a = _tighten_pauses(_trim_silence(a.squeeze(), sr), sr, max_len=CLAUSE_PAUSE_COMMA)
-            a = _even_rate(a, sr, clause, f"{key}_c{i}")
+            if ref and ref.is_file():   # chỉ giọng clone mới cần ép tốc độ; giọng mặc định đọc đều, ép atempo làm vỡ tiếng
+                a = _even_rate(a, sr, clause, f"{key}_c{i}")
             parts.append(a)
             if i + 1 < len(clauses):
                 parts.append(np.zeros(int(CLAUSE_PAUSE_END * sr), dtype=np.float32))

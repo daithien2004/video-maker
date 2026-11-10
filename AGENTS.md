@@ -24,7 +24,7 @@ Cấu trúc tối giản: `assets/`, `output/`, `work/`, `config/`, `skills/`, `
 ## Video thường (không phải Threads)
 
 Khi người dùng ra lệnh "Làm video" (hoặc đưa đề tài/kịch bản thô), đọc và làm đúng
-[skill làm video thường](skills/lam-video-thuong/SKILL.md): AI tự viết kịch bản ngắn (25–35 giây), tự tải ảnh thật bằng
+[skill làm video thường](skills/lam-video-thuong/SKILL.md): AI tự viết kịch bản khoảng 1 phút (240–300 từ, nhóm hơi có dấu phẩy, nhấn tối đa 1 cụm mỗi nhịp), tự tải ảnh thật bằng
 `tools/tai_anh.py` (phải xem ảnh trước khi gán; ảnh đầu = ảnh cuối), dựng preview bằng `tools/render_script.py`
 và tự kiểm bằng `tools/kiem_video.py`. Phần dựng (mascot, pop ảnh đầu, phụ đề, giọng, tốc độ) đã chốt, không tự chỉnh.
 Dừng ở preview; chỉ xuất video hoặc đăng bài khi người dùng yêu cầu. Máy kiểm `lint_rows` không còn là cổng.

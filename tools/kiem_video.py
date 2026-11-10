@@ -18,7 +18,8 @@ from videomaker import pipeline as pl  # noqa: E402
 
 WORK = ROOT / "work"
 MIN_SUB, WARN_SUB = 0.15, 0.25     # giây: phụ đề ngắn hơn mức này là lỗi / lưu ý
-MIN_LEN, MAX_LEN = 22.0, 50.0      # giây: độ dài video mong muốn
+MIN_LEN, MAX_LEN = 50.0, 80.0      # giây: độ dài video mong muốn (chuẩn ~1 phút)
+WEAK_END = {"cái", "một", "của", "và", "là", "để", "cho", "trong", "với", "những", "các", "thì", "mà", "bị", "được", "ở", "từ", "như", "này", "ấy"}
 
 
 def newest(pattern: str) -> Path | None:
@@ -29,6 +30,44 @@ def newest(pattern: str) -> Path | None:
 def ass_sec(t: str) -> float:
     h, m, s = t.split(":")
     return int(h) * 3600 + int(m) * 60 + float(s)
+
+
+def style_notes(rows, content: str) -> list[str]:
+    """Soi ngắt nghỉ và nhấn mạnh: phụ đề cắt đúng chỗ giọng nghỉ, nhấn ít và đúng từ khóa."""
+    out = []
+    for i, r in enumerate(rows, 1):
+        items = pl.parse_emph(str(r[1]))
+        # đoạn giữa hai dấu câu quá dài: giọng không nghỉ, phụ đề bị cắt máy móc
+        run = 0
+        for w, _ in items:
+            run += 1
+            if w[-1] in ",;:.!?…":
+                if run > 10:
+                    out.append(f"nhịp {i}: có đoạn {run} từ không dấu phẩy (thêm dấu phẩy ở chỗ giọng nghỉ)")
+                run = 0
+        if run > 10:
+            out.append(f"nhịp {i}: có đoạn {run} từ không dấu phẩy")
+        groups, prev = [], False
+        for w, e in items:
+            if e and not prev:
+                groups.append([])
+            if e:
+                groups[-1].append(w.strip(",;:.!?…").lower())
+            prev = e
+        if len(groups) > 2 or any(len(g) > 3 for g in groups):
+            out.append(f"nhịp {i}: nhấn quá nhiều ({len(groups)} cụm) hoặc cụm nhấn quá dài")
+        if any(g[0] in WEAK_END or g[-1] in WEAK_END for g in groups):
+            out.append(f"nhịp {i}: nhấn vào từ phụ (cái/của/và…)")
+        try:
+            chunks = pl.split_items(items, 4, content=content)
+        except ValueError:
+            continue
+        for c, nxt in zip(chunks, chunks[1:]):
+            if c[-1][1] and nxt[0][1]:
+                out.append(f"nhịp {i}: cụm nhấn bị cắt đôi ở '{c[-1][0]} | {nxt[0][0]}'")
+            if c[-1][0][-1] not in ",;:.!?…" and c[-1][0].lower() in WEAK_END:
+                out.append(f"nhịp {i}: phụ đề kết thúc bằng từ nối '{c[-1][0]}' (thêm dấu phẩy trước/đổi cách chia)")
+    return out
 
 
 def main() -> None:
@@ -54,8 +93,11 @@ def main() -> None:
         bad.append("ảnh bị lặp ở giữa video: " + ", ".join(sorted(dup)))
     if names and names[0] != names[-1]:
         bad.append(f"ảnh đầu ({names[0]}) khác ảnh cuối ({names[-1]})")
-    if not 85 <= words <= 160:
-        note.append(f"{words} từ — mẫu chuẩn khoảng 100–130 từ (25–35 giây)")
+    if not 235 <= words <= 320:
+        bad.append(f"{words} từ — chuẩn 235–320 từ (khoảng 1 phút, đo thực tế ~4,3 từ/giây)")
+    if not 12 <= len(rows) <= 22:
+        note.append(f"{len(rows)} nhịp — chuẩn 12–22 nhịp")
+    note += style_notes(rows, a.content)
 
     job, prev = newest("job_*"), newest("preview_*.mp4")
     if prev:
