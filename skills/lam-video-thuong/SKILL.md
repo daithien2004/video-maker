@@ -64,6 +64,12 @@ Mỗi dòng một nhịp: `[the] lời đọc, có *chữ nhấn*`. **Không dù
 - **Tên nước ngoài** TTS đọc sai: giữ tên gốc trong kịch bản và thêm một dòng `Tên = cách đọc` vào `assets/phat-am.txt`
   (mỗi tên một từ ↔ một từ). Tên riêng cần đứng thành một cụm chữ thì thêm vào `assets/illus/<noi-dung>/ten-rieng.txt`.
 - Đọc lại cả bài từ đầu tới cuối: chỗ nào phải quay lại nhịp trước mới hiểu thì viết lại.
+- **Đọc nguội (bắt buộc, trước khi tìm ảnh):** `kiem_video.py` chỉ đếm từ/phẩy/ảnh, không biết kịch bản có khó hiểu không. Gọi một
+  subagent mới (không biết gì về đề tài, không đưa `SOURCES.txt`), đưa **chỉ** `kich-ban.txt` và bảo: đọc như người nghe một lần, liệt kê
+  mọi chỗ (a) thuật ngữ/vật/người xuất hiện mà chưa được giới thiệu, (b) nhảy từ ý A sang C thiếu bước nối ("vì sao việc này dẫn tới việc kia"),
+  (c) đại từ/"cũng"/"ấy" trỏ tới thứ chưa nhắc, (d) phải đoán mới hiểu. Mỗi chỗ ghi nhịp + câu hỏi người nghe sẽ đặt ra.
+  Sửa kịch bản (thêm nhịp, thêm một câu giải thích) cho đến khi không còn chỗ nào, mỗi bước nhân quả một nhịp; dữ kiện thêm vào phải có trong
+  `SOURCES.txt`. Thêm nhịp thì thêm ảnh khác tương ứng (mục 3).
 
 ### 3. Ảnh thật — mỗi nhịp một ảnh, ảnh đầu = ảnh cuối
 - Muốn ~1 phút cần 12–20 nhịp nên **cần 11–19 ảnh khác nhau**: tìm đủ ảnh *trước* khi chốt số nhịp (đề tài ít ảnh thì chọn đề tài khác, không nhồi nhịp). Cần **số ảnh khác nhau = số nhịp − 1** (nhịp đầu và nhịp cuối dùng **cùng một thẻ `[the]`**, tức cùng một ảnh). Không meme.
@@ -87,10 +93,13 @@ Không chạy `lint_rows` và không sửa câu chỉ để hết cảnh báo (`
 ```
 Kiểm: mọi nhịp có ảnh và ảnh tồn tại, không ảnh lặp ở giữa, ảnh đầu = ảnh cuối, không phụ đề nào gần như không hiện, độ dài 50–80 giây,
 235–320 từ, 12–22 nhịp, và soi ngắt nghỉ/nhấn (đoạn >10 tiếng không phẩy, nhấn quá nhiều hoặc vào từ phụ, phụ đề cắt giữa cụm nhấn hoặc kết bằng từ nối).
-Các **LƯU Ý** về ngắt nghỉ/nhấn cũng phải sửa trong kịch bản (thêm/bớt phẩy, bỏ nhấn) rồi dựng và kiểm lại, không bỏ qua. Có **LỖI** thì sửa (đổi ảnh, rút kịch bản…) rồi dựng và kiểm lại; chỉ báo người dùng khi **ĐẠT** hoặc nói rõ lỗi còn lại.
+Các **LƯU Ý** về ngắt nghỉ/nhấn cũng phải sửa trong kịch bản (thêm/bớt phẩy, bỏ nhấn) rồi dựng và kiểm lại, không bỏ qua.
+Mẹo sửa nhanh: phụ đề kết bằng "một/những/này/ấy" hoặc có cụm lẻ ("để đẩy", "của nó") thì viết lại câu cho các từ đó nằm giữa cụm
+(bỏ "một", đổi "những"→bỏ hẳn, thay "ấy/này" bằng "nó"), không chỉ thêm phẩy; đoạn 11 tiếng không phẩy thì tách thành hai câu ngắn.
+Máy kiểm **không** biết kịch bản có dễ hiểu không; việc đó do bước đọc nguội ở mục 2. Có **LỖI** thì sửa (đổi ảnh, rút kịch bản…) rồi dựng và kiểm lại; chỉ báo người dùng khi **ĐẠT** hoặc nói rõ lỗi còn lại.
 
 ### 6. Bàn giao
-Báo: đường dẫn preview, kết quả kiểm, đề tài + nguồn, danh sách ảnh (tác giả/giấy phép nếu cần ghi), những gì chưa chắc.
+Báo: đường dẫn preview, kết quả kiểm, kết quả đọc nguội (còn hổng nào không), đề tài + nguồn, danh sách ảnh (tác giả/giấy phép nếu cần ghi), những gì chưa chắc.
 **Không tự xuất mp4 hoặc đăng.** Người dùng nói "xuất"/"đăng" mới làm.
 
 ## Khi người dùng đưa kịch bản hoặc đoạn văn thô
