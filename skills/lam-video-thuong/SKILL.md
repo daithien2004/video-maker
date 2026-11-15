@@ -46,14 +46,29 @@ Mỗi dòng một nhịp: `[the] lời đọc, có *chữ nhấn*`. **Không dù
   - **Không** phẩy giữa chủ–vị ngắn, trong cụm danh từ/tên riêng/số–đơn vị ("45 bằng sáng chế", "9 giờ 45"), giữa động từ và tân ngữ.
   - Chỗ đảo chiều/quan trọng dùng **câu riêng ngắn** (dấu chấm = nghỉ dài nhất), không dùng dấu hai chấm nối dài.
   - **Không thêm dấu phẩy chỉ để hết LƯU Ý** — dấu phẩy sai chỗ (giữa động từ và tân ngữ) làm giọng nghỉ sai, tệ hơn câu dài. Soát: đọc to; chỗ nào mình không ngừng thở thì không đặt phẩy; chỗ nào hụt hơi thì thiếu phẩy.
-- **Hook = câu kể tự nhiên, đủ chủ ngữ vị ngữ, 15–25 từ**, nêu chủ thể bằng danh từ chung, đặt **cái quen cạnh chỗ lệch**
-  (số lớn đối với kết quả ngược kỳ vọng, nguyên nhân nhỏ đối với hệ quả lớn). Không lộ lời giải, không tiêu đề báo.
-  Câu hỏi "Tại sao…?" chỉ là một cách, không bắt buộc.
+- **Hook phải làm người nghe tự hỏi "sao vậy?" ngay trong một câu, 15–25 tiếng.** Tin báo kiểu "Năm 1930, A nhận bằng sáng chế cho B"
+  **không phải hook** (kể sự kiện, không có chỗ lệch, người nghe chưa thắc mắc gì). Dùng một trong hai mẫu đã chạy tốt trong kho video này:
+  - **(A) Câu hỏi nghịch lý, cụ thể, đời thường:** "Tại sao khi gà mái đẻ trứng, người ta lại thường để lại một quả trong ổ?" (video mẫu);
+    "Tại sao Einstein, người tìm ra thuyết tương đối, lại đi chế tạo tủ lạnh?" Đặt hai thứ không ăn khớp cạnh nhau trong câu hỏi.
+  - **(B) "Vậy mà" — cái quen cạnh chỗ lệch:** "Hôm đó không có bão lớn. Vậy mà cây cầu… tự xoắn như dây thừng rồi gãy đôi."
+    (số lớn mà kết quả ngược kỳ vọng, nguyên nhân nhỏ mà hệ quả lớn).
+  Ví dụ đã đạt: "Tại sao Intel lại phải trả 60.000 đô, để được bán con chip do chính mình làm ra?" (bản cũ mở bằng tên hãng và mốc năm, không hook).
+  **Cách tìm hook:** sau khi đọc nguồn, liệt kê 2–3 chi tiết *nghịch* (ai phải trả/mất/thua một thứ ngược lẽ thường; thứ nhỏ gây việc lớn;
+  kết quả ngược mục đích ban đầu), chọn cái mạnh nhất làm hook, rồi kể ngược lại *vì sao* nó xảy ra. Nguồn không nói vì sao (ví dụ lý do của một bên)
+  thì chỉ nói đúng điều nguồn có, không bịa lý do.
+  Hook lấy **chi tiết gây lệch mạnh nhất** của đề tài, kể cả khi nó nằm cuối chuỗi sự kiện (đừng mở bằng mốc thời gian rồi để chi tiết hay
+  nằm tận giữa bài). Không lộ lời giải, không tiêu đề báo, không mở bằng "Năm …,". Câu kết phải **trả lời đúng câu hỏi của hook**.
+- **Mạch kiểu và–nhưng–vì thế (ABT):** kịch bản là chuỗi *vấn đề → trở ngại → hệ quả*, không phải dòng thời gian "rồi… rồi…". Soát từng chỗ nối:
+  nếu hai nhịp chỉ nối bằng "và/rồi/cùng thời" (chỉ xếp sự kiện cạnh nhau) thì thay bằng "nhưng" (có trở ngại) hoặc "vì thế/nên" (có hệ quả),
+  hoặc bỏ nhịp đó. Nhịp chỉ là số liệu phụ (ngày cấp, số bằng, số nước) mà người nghe không cần để hiểu thì rút gọn vào nhịp khác.
 - **Mạch:** hook → trả lời ngay ("Thật ra…") → chuỗi nguyên nhân–kết quả có từ nối ("Nhưng", "Vấn đề là", "Chính vì thế") →
   **câu kết khép lại ý chính và nhắc lại hook**. Cần ≥2 chỗ "Nhưng" và một nhịp 1 câu ngắn ở chỗ đảo chiều. Không kết bằng câu hỏi mở,
   không kêu gọi. **Câu cuối phải nghe như dấu chấm hết:** một câu ngắn, chốt đúng cái hook đã hỏi, không thêm mệnh đề phụ
   ("đúng lúc…", "và rồi…") và không nêu ý mới. **Mở câu kết bằng từ nối kết luận ("Vậy là…", "Tóm lại…") và giữ nguyên chủ đề
   của nhịp ngay trước**, không đổi chủ ngữ sang một đối tượng mới — đổi chủ ngữ làm người nghe tưởng sắp sang phần mới.
+- **Bỏ chi tiết kỹ thuật người nghe không cần để theo mạch** (số bit, kilohertz, tên công nghệ, số hiệu model): mỗi nhịp một ý hiểu được,
+  tối đa một con số then chốt. Phần "sau đó" của đề tài (chuỗi sản phẩm/sự kiện kế tiếp) dồn vào 2–3 nhịp có chủ đề, không liệt kê từng mốc/tên model
+  (bản Intel cũ liệt kê 8008, 8080, 8086, 8088, x86 nghe như bảng niên biểu).
 - **Giọng:** trung tính, rõ, chắc. Không cảm thán, không "thật bất ngờ/kinh ngạc", không văn viết ("tuy nhiên", "nhằm", "tiến hành").
   Sự lệch tự lộ bằng dữ kiện đặt cạnh nhau, không bằng tính từ. Câu nào bỏ đi không ai nhận ra thì xoá.
 - **Chữ nhấn `*...*`:** **tối đa 1 cụm mỗi nhịp** (nhịp bình thường có thể không nhấn gì), 1–3 từ, nằm gọn trong một cụm phẩy.
@@ -66,6 +81,8 @@ Mỗi dòng một nhịp: `[the] lời đọc, có *chữ nhấn*`. **Không dù
 - Đọc lại cả bài từ đầu tới cuối: chỗ nào phải quay lại nhịp trước mới hiểu thì viết lại.
 - **Đọc nguội (bắt buộc, trước khi tìm ảnh):** `kiem_video.py` chỉ đếm từ/phẩy/ảnh, không biết kịch bản có khó hiểu không. Gọi một
   subagent mới (không biết gì về đề tài, không đưa `SOURCES.txt`), đưa **chỉ** `kich-ban.txt` và bảo: đọc như người nghe một lần, liệt kê
+  **sau câu đầu tiên** (hook) trả lời: "Tôi đang thắc mắc điều gì? Có muốn nghe tiếp không, vì sao?" — không thắc mắc gì thì hook hỏng, viết lại.
+  Rồi đọc hết và liệt kê
   mọi chỗ (a) thuật ngữ/vật/người xuất hiện mà chưa được giới thiệu, (b) nhảy từ ý A sang C thiếu bước nối ("vì sao việc này dẫn tới việc kia"),
   (c) đại từ/"cũng"/"ấy" trỏ tới thứ chưa nhắc, (d) phải đoán mới hiểu. Mỗi chỗ ghi nhịp + câu hỏi người nghe sẽ đặt ra.
   Sửa kịch bản (thêm nhịp, thêm một câu giải thích) cho đến khi không còn chỗ nào, mỗi bước nhân quả một nhịp; dữ kiện thêm vào phải có trong
