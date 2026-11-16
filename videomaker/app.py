@@ -45,7 +45,7 @@ DEFAULTS = {
     "outline_color": "#FF9A1F", "outline_w": 9, "text_y": 880, "max_words": 4, "pop": False,
     "meme_y": 150, "meme_w": 960, "meme_h": 640, "carry": True, "use_music": False,
     "music_vol": 0.08, "nvenc": False, "emph_color": "#FF9A1F", "emph_scale": 1.4,
-    "tier_gap_scale": 0.8,
+    "tier_gap_scale": 1.0,
     "content": "", "gap": pl.GAP, "threads_radius": 0, "threads_side_margin": 108,
     "threads_shadow": 0, "threads_padding": 0, "threads_max_height": 640, "threads_zoom": 140,
     "threads_padding_top": -1, "threads_padding_right": -1, "threads_padding_bottom": -1, "threads_padding_left": -1,
@@ -142,7 +142,7 @@ def make_opts(backend, voice, speed, bg, upper, font, font_size, text_color, out
               threads_padding=0, threads_max_height=640, threads_padding_top=-1,
               threads_padding_right=-1, threads_padding_bottom=-1, threads_padding_left=-1, threads_zoom=140,
               card_motion=True, karaoke=False, bg_motion=True, pop_in=True, sfx=True,
-              fps=60, mascot=True, next_card=True, align_subs=True, tier_gap_scale=0.8) -> pl.Options:
+              fps=60, mascot=True, next_card=True, align_subs=True, tier_gap_scale=1.0) -> pl.Options:
     return pl.Options(
         backend=backend, voice=voice or "", speed=float(speed), bg=bg or "ngẫu nhiên",
         content=(content or "").strip(), gap=float(gap),

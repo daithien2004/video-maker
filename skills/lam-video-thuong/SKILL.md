@@ -45,7 +45,12 @@ Mỗi dòng một nhịp: `[the] lời đọc, có *chữ nhấn*`. **Không dù
     giữa hai vế song song, sau chủ ngữ dài.
   - **Không** phẩy giữa chủ–vị ngắn, trong cụm danh từ/tên riêng/số–đơn vị ("45 bằng sáng chế", "9 giờ 45"), giữa động từ và tân ngữ.
   - Chỗ đảo chiều/quan trọng dùng **câu riêng ngắn** (dấu chấm = nghỉ dài nhất), không dùng dấu hai chấm nối dài.
-  - **Không thêm dấu phẩy chỉ để hết LƯU Ý** — dấu phẩy sai chỗ (giữa động từ và tân ngữ) làm giọng nghỉ sai, tệ hơn câu dài. Soát: đọc to; chỗ nào mình không ngừng thở thì không đặt phẩy; chỗ nào hụt hơi thì thiếu phẩy.
+  - **Không thêm dấu phẩy chỉ để hết LƯU Ý** — dấu phẩy sai chỗ (giữa động từ và tân ngữ) làm giọng nghỉ sai, tệ hơn câu dài.
+    **Lý do kỹ thuật:** `synth()` chỉ tách TTS theo *câu* (`. ! ? …`); dấu phẩy trong câu do model VieNeu tự ngắt, nên mỗi dấu phẩy là một
+    chỗ giọng dừng thật. Phẩy chen giữa động từ–tân ngữ ("người ta thấy, cách người xưa…"), tên–đồng vị ("Eric Lawes, mang máy dò, tới…"),
+    sau chủ ngữ ngắn, hoặc kẹp một cụm giữa câu làm giọng cụt, nghe không mượt. Bản Einstein/Intel/Hoxne đầu bị đúng lỗi này vì phẩy được
+    thêm để vừa máy kiểm. Chỉ phẩy: sau trạng ngữ mở đầu, trước "nhưng/nên/vì/và/rồi", giữa các vế liệt kê. Đoạn 11 tiếng không phẩy thì
+    **tách thành hai câu ngắn bằng dấu chấm** hoặc chấp nhận LƯU Ý đó, không chèn phẩy. Soát: đọc to; chỗ nào mình không ngừng thở thì không đặt phẩy; chỗ nào hụt hơi thì thiếu phẩy.
 - **Hook phải làm người nghe tự hỏi "sao vậy?" ngay trong một câu, 15–25 tiếng.** Tin báo kiểu "Năm 1930, A nhận bằng sáng chế cho B"
   **không phải hook** (kể sự kiện, không có chỗ lệch, người nghe chưa thắc mắc gì). Dùng một trong hai mẫu đã chạy tốt trong kho video này:
   - **(A) Câu hỏi nghịch lý, cụ thể, đời thường:** "Tại sao khi gà mái đẻ trứng, người ta lại thường để lại một quả trong ổ?" (video mẫu);
@@ -56,6 +61,11 @@ Mỗi dòng một nhịp: `[the] lời đọc, có *chữ nhấn*`. **Không dù
   **Cách tìm hook:** sau khi đọc nguồn, liệt kê 2–3 chi tiết *nghịch* (ai phải trả/mất/thua một thứ ngược lẽ thường; thứ nhỏ gây việc lớn;
   kết quả ngược mục đích ban đầu), chọn cái mạnh nhất làm hook, rồi kể ngược lại *vì sao* nó xảy ra. Nguồn không nói vì sao (ví dụ lý do của một bên)
   thì chỉ nói đúng điều nguồn có, không bịa lý do.
+  **Hook nêu nghịch lý cho người nghe *muốn biết làm sao*.** Người dùng đã chọn rõ: "Gần mười lăm nghìn đồng xu La Mã, được tìm ra từ một
+  chiếc búa bị mất" (nêu thẳng cú ngoặt, phần thân kể *làm sao có chuyện đó* từng bước) hay hơn hook "vì sao dừng đào" (đúng chuyên môn nhưng khô,
+  người xem thường không quan tâm khảo cổ). Chọn nghịch lý **gần gũi, dễ hình dung, có cảm xúc** (đồ nhỏ nhặt → hệ quả lớn, mất cái này → được cái kia)
+  hơn là nghịch lý của giới chuyên môn. Thân bài phải thật sự giải thích bằng chuỗi nhân quả; nếu nguồn nói chưa ai biết một lời giải thì nói đúng
+  như vậy, không bịa giả thuyết không có trong nguồn. Phải hỏi người dùng khi hai hướng hook đều hợp lý.
   Hook lấy **chi tiết gây lệch mạnh nhất** của đề tài, kể cả khi nó nằm cuối chuỗi sự kiện (đừng mở bằng mốc thời gian rồi để chi tiết hay
   nằm tận giữa bài). Không lộ lời giải, không tiêu đề báo, không mở bằng "Năm …,". Câu kết phải **trả lời đúng câu hỏi của hook**.
 - **Mạch kiểu và–nhưng–vì thế (ABT):** kịch bản là chuỗi *vấn đề → trở ngại → hệ quả*, không phải dòng thời gian "rồi… rồi…". Soát từng chỗ nối:
@@ -66,6 +76,15 @@ Mỗi dòng một nhịp: `[the] lời đọc, có *chữ nhấn*`. **Không dù
   không kêu gọi. **Câu cuối phải nghe như dấu chấm hết:** một câu ngắn, chốt đúng cái hook đã hỏi, không thêm mệnh đề phụ
   ("đúng lúc…", "và rồi…") và không nêu ý mới. **Mở câu kết bằng từ nối kết luận ("Vậy là…", "Tóm lại…") và giữ nguyên chủ đề
   của nhịp ngay trước**, không đổi chủ ngữ sang một đối tượng mới — đổi chủ ngữ làm người nghe tưởng sắp sang phần mới.
+- **Giải thích, không tường thuật.** Video hay là *trả lời một câu hỏi* (như video gà mái: hỏi → vì A → nên B → nên C), không phải kể lại sự việc
+  theo thứ tự (ngày, tên, việc nọ tới việc kia). Làm trước khi viết: ghi **một câu đáp án** cho câu hỏi hook ("vì dừng đào nên giữ nguyên hiện trường").
+  Mọi nhịp phải thuộc một trong ba loại: dựng bối cảnh tối thiểu để hiểu câu hỏi, một bước của lời giải thích ("vì/nên/nhờ"), hoặc hệ quả cho
+  thấy đáp án đúng. Nhịp chỉ là thông tin phụ (giá tiền, chia tiền, danh mục, số lượng) mà không phục vụ đáp án thì bỏ, đừng giữ cho đủ độ dài —
+  bù độ dài bằng bước giải thích còn thiếu (vì sao việc đó quan trọng, nếu không thì mất gì). Đọc nguội phải hỏi: "bao nhiêu nhịp đang trả lời hook?";
+  dưới 2/3 thì viết lại (bản Hoxne kể chuyện chỉ đạt khoảng 1/3).
+- **Không kiểm kê.** Đề tài có nhiều món (kho báu, bộ sưu tập, danh sách thiết bị) thì gom vào **một nhịp** và chọn 1–2 món đáng nhớ,
+  không mỗi món một nhịp kèm con số (bản Hoxne cũ: 569 vàng, 14272 bạc, 98 thìa, 4 hộp tiêu, 29 trang sức… mỗi thứ một nhịp). Nhịp thừa thì bỏ,
+  đừng giữ chỉ để đủ số nhịp (12 nhịp là đủ).
 - **Bỏ chi tiết kỹ thuật người nghe không cần để theo mạch** (số bit, kilohertz, tên công nghệ, số hiệu model): mỗi nhịp một ý hiểu được,
   tối đa một con số then chốt. Phần "sau đó" của đề tài (chuỗi sản phẩm/sự kiện kế tiếp) dồn vào 2–3 nhịp có chủ đề, không liệt kê từng mốc/tên model
   (bản Intel cũ liệt kê 8008, 8080, 8086, 8088, x86 nghe như bảng niên biểu).
@@ -110,7 +129,7 @@ Không chạy `lint_rows` và không sửa câu chỉ để hết cảnh báo (`
 ```
 Kiểm: mọi nhịp có ảnh và ảnh tồn tại, không ảnh lặp ở giữa, ảnh đầu = ảnh cuối, không phụ đề nào gần như không hiện, độ dài 50–80 giây,
 235–320 từ, 12–22 nhịp, và soi ngắt nghỉ/nhấn (đoạn >10 tiếng không phẩy, nhấn quá nhiều hoặc vào từ phụ, phụ đề cắt giữa cụm nhấn hoặc kết bằng từ nối).
-Các **LƯU Ý** về ngắt nghỉ/nhấn cũng phải sửa trong kịch bản (thêm/bớt phẩy, bỏ nhấn) rồi dựng và kiểm lại, không bỏ qua.
+Các **LƯU Ý** về ngắt nghỉ/nhấn cũng phải sửa trong kịch bản (viết lại câu, tách câu bằng dấu chấm, bỏ nhấn; **không chèn phẩy sai chỗ chỉ để hết cảnh báo**, xem mục 2) rồi dựng và kiểm lại, không bỏ qua.
 Mẹo sửa nhanh: phụ đề kết bằng "một/những/này/ấy" hoặc có cụm lẻ ("để đẩy", "của nó") thì viết lại câu cho các từ đó nằm giữa cụm
 (bỏ "một", đổi "những"→bỏ hẳn, thay "ấy/này" bằng "nó"), không chỉ thêm phẩy; đoạn 11 tiếng không phẩy thì tách thành hai câu ngắn.
 Máy kiểm **không** biết kịch bản có dễ hiểu không; việc đó do bước đọc nguội ở mục 2. Có **LỖI** thì sửa (đổi ảnh, rút kịch bản…) rồi dựng và kiểm lại; chỉ báo người dùng khi **ĐẠT** hoặc nói rõ lỗi còn lại.

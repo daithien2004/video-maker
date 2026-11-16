@@ -680,7 +680,7 @@ class Options:
     nvenc: bool = False
     emph_color: str = "#FF9A1F"   # bậc chữ lớn: nền màu nhấn, viền trắng
     emph_scale: float = 1.4       # bậc nhấn to gấp mấy lần bậc nhỏ
-    tier_gap_scale: float = 0.8   # khe giữa 2 bậc chữ = từng này khoảng dòng tự nhiên
+    tier_gap_scale: float = 1.0   # khe giữa 2 bậc chữ = từng này khoảng dòng tự nhiên
     card_motion: bool = True       # card ảnh nở nhẹ + trôi chậm trong mỗi mục
     karaoke: bool = True           # tô sáng lần lượt từng từ khi đọc (chỉ nhịp có chữ)
     bg_motion: bool = True         # nền phóng chậm suốt video để khung hình không đứng yên
