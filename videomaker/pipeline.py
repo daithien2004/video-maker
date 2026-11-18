@@ -45,7 +45,7 @@ AUDIO_EXT = {".mp3", ".wav", ".m4a", ".ogg", ".flac"}
 W, H = 1080, 1920   # khung dọc; fps lấy theo opt.fps (mặc định 60)
 LEAD = 0.25   # giây im lặng đầu video
 GAP = 0.10    # khoảng nghỉ giữa các dòng
-CLAUSE_PAUSE_END = 0.38    # giây nghỉ sau . ! ? giữa hai câu trong một nhịp
+CLAUSE_PAUSE_END = 0.26    # giây nghỉ sau . ! ? giữa hai câu trong một nhịp
 CLAUSE_PAUSE_COMMA = 0.22  # giây tối đa của một khoảng lặng bên trong một câu (phẩy, ngắt cụm)
 TAIL = 0.6    # giây im lặng cuối video
 ZOOM_HOLD = 1.0   # giữ card đã phóng to thêm chút sau tiếng zoom cho kịp nhìn
@@ -578,7 +578,7 @@ def _even_rate(a: np.ndarray, sr: int, clause: str, tag: str) -> np.ndarray:
 
 
 def voice_cache_key(backend: str, voice: str, speed: float, text: str) -> str:
-    return hashlib.sha1(f"{backend}|{voice}|{speed:.2f}|p15|{text}".encode("utf-8")).hexdigest()[:20]
+    return hashlib.sha1(f"{backend}|{voice}|{speed:.2f}|p16|{text}".encode("utf-8")).hexdigest()[:20]
 
 
 PRONOUNCE_FILE = ASSETS / "phat-am.txt"   # mỗi dòng: Tên viết = cách đọc cho TTS (vd Schabowski = Sa-bốp-xki)

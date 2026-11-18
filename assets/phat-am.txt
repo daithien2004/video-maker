@@ -35,3 +35,6 @@ Lawes = Lô-zơ
 98 = chín-mươi-tám
 29 = hai-mươi-chín
 407 = bốn-trăm-lẻ-bảy
+Lunokhod = Lu-nô-khốt
+Luna = Lu-na
+NASA = Na-sa

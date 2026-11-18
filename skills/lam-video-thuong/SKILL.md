@@ -17,7 +17,7 @@ kết bằng câu giải thích cuối. Video 30 giây là **quá ngắn**: thi�
 ## Phần dựng đã làm sẵn — KHÔNG chỉnh trừ khi người dùng yêu cầu
 
 Mascot trồi lên từ đầu và trượt xuống ở cuối; chỉ ảnh đầu có tiếng pop, các ảnh sau chuyển im lặng; phụ đề ngắn bám lời đọc
-(căn mốc theo giọng thật) có chữ nhấn; giọng **mặc định** của VieNeu (`"voice": ""` trong `config/settings.json`, không clone); tốc độ đọc **1,2** (đọc ở 1,0 người dùng chê quá chậm; câu nghỉ theo dấu câu, `CLAUSE_*` ở `videomaker/pipeline.py`).
+(căn mốc theo giọng thật) có chữ nhấn; giọng **mặc định** của VieNeu (`"voice": ""` trong `config/settings.json`, không clone); tốc độ đọc **1,2** (đọc ở 1,0 người dùng chê quá chậm; nghỉ giữa câu 0,26 giây, `CLAUSE_*` ở `videomaker/pipeline.py`).
 `config/settings.json` bị git bỏ qua nên **kiểm trước khi dựng**: `"voice": ""` (không clone) và `"speed": 1.2`; lệnh dựng bên dưới đã kèm
 `--speed 1.2`. Giọng mặc định không bị ép tốc độ từng câu (co giãn `atempo` làm tiếng vỡ, chỉ dùng cho giọng clone).
 Không tự đổi giọng, tốc độ, nghỉ, cỡ chữ.
@@ -35,7 +35,7 @@ Không tự đổi giọng, tốc độ, nghỉ, cỡ chữ.
 
 ### 2. Viết kịch bản (`assets/illus/<noi-dung>/kich-ban.txt`)
 Mỗi dòng một nhịp: `[the] lời đọc, có *chữ nhấn*`. **Không dùng `||`** (làm lệch phụ đề). `[the]` = tên thư mục ảnh của nhịp.
-- **12–20 nhịp, 240–300 từ (~1 phút).** Mỗi nhịp 1–3 câu, mỗi câu một ý, ≤15 từ. Câu ngắn xen câu vừa. Dài phải do **thêm hiểu biết**,
+- **12–20 nhịp, 240–300 từ (~1 phút).** Mỗi nhịp 1–3 câu, mỗi câu một ý, ≤15 từ. Câu ngắn xen câu vừa, nhưng trong một nhịp các câu phải nối nhau bằng vì/nên/nhưng/thế mà thành một đoạn; cả bài toàn câu ngắn rời nghe như các mảnh ghép. Dài phải do **thêm hiểu biết**,
   không do kéo dài: giải thích bối cảnh (ai, ở đâu, lúc nào), thuật ngữ lần đầu xuất hiện (nói một câu nó là gì), và **từng bước** của
   chuỗi nguyên nhân. Mỗi bước nhân quả một nhịp; không nhảy từ A sang C. Người chưa biết gì về đề tài nghe một lần phải hiểu.
 - **Ngắt nghỉ = dấu phẩy. Viết theo nhóm hơi (breath group).** Giọng nghỉ ở dấu phẩy/chấm và phụ đề cũng cắt ở đúng đó, nên:
@@ -98,6 +98,7 @@ Mỗi dòng một nhịp: `[the] lời đọc, có *chữ nhấn*`. **Không dù
 - **Tên nước ngoài** TTS đọc sai: giữ tên gốc trong kịch bản và thêm một dòng `Tên = cách đọc` vào `assets/phat-am.txt`
   (mỗi tên một từ ↔ một từ). Tên riêng cần đứng thành một cụm chữ thì thêm vào `assets/illus/<noi-dung>/ten-rieng.txt`.
 - Đọc lại cả bài từ đầu tới cuối: chỗ nào phải quay lại nhịp trước mới hiểu thì viết lại.
+- **Cụm danh từ mơ hồ, dễ lẫn âm:** "chương trình đưa người" đọc lên nghe như "chưa trình…"; nói rõ đối tượng và đích ("kế hoạch đưa người lên Mặt Trăng"). Đọc to các câu mở đầu nhịp; chỗ nào phải đoán mới hiểu thì đổi cách nói, không thêm phẩy.
 - **Đọc nguội (bắt buộc, trước khi tìm ảnh):** `kiem_video.py` chỉ đếm từ/phẩy/ảnh, không biết kịch bản có khó hiểu không. Gọi một
   subagent mới (không biết gì về đề tài, không đưa `SOURCES.txt`), đưa **chỉ** `kich-ban.txt` và bảo: đọc như người nghe một lần, liệt kê
   **sau câu đầu tiên** (hook) trả lời: "Tôi đang thắc mắc điều gì? Có muốn nghe tiếp không, vì sao?" — không thắc mắc gì thì hook hỏng, viết lại.
@@ -115,6 +116,8 @@ Mỗi dòng một nhịp: `[the] lời đọc, có *chữ nhấn*`. **Không dù
 - Chọn: `python tools/tai_anh.py chon <noi-dung> <the> <file-ung-vien>` → chép vào `assets/illus/<noi-dung>/<the>/` và ghi nguồn + giấy phép vào `SOURCES.txt`.
 - Không tìm được ảnh đúng cảnh thì **đổi câu hoặc đổi đề tài**, không gán ảnh sai cho đủ. Ảnh CC BY / CC BY-SA cần ghi tác giả khi đăng
   (đã có trong `SOURCES.txt`).
+- Gán xong, mở lại từng ảnh đối chiếu với câu của nhịp và ghi rõ **khớp chặt / chỉ gợi**. Nhịp chỉ gợi (ảnh bảo tàng chung, bản đồ không
+  thấy quãng đường) thì đổi ảnh hoặc sửa câu; gửi kèm danh sách này khi bàn giao.
 - Thư viện cũ trong `assets/illus/` có thể dùng lại nếu đúng đề tài, nhưng vẫn phải xem ảnh thật (nhiều ảnh đặt tên sai nội dung).
 
 ### 4. Dựng preview
@@ -133,10 +136,16 @@ Các **LƯU Ý** về ngắt nghỉ/nhấn cũng phải sửa trong kịch bản
 Mẹo sửa nhanh: phụ đề kết bằng "một/những/này/ấy" hoặc có cụm lẻ ("để đẩy", "của nó") thì viết lại câu cho các từ đó nằm giữa cụm
 (bỏ "một", đổi "những"→bỏ hẳn, thay "ấy/này" bằng "nó"), không chỉ thêm phẩy; đoạn 11 tiếng không phẩy thì tách thành hai câu ngắn.
 Máy kiểm **không** biết kịch bản có dễ hiểu không; việc đó do bước đọc nguội ở mục 2. Có **LỖI** thì sửa (đổi ảnh, rút kịch bản…) rồi dựng và kiểm lại; chỉ báo người dùng khi **ĐẠT** hoặc nói rõ lỗi còn lại.
+- Trích 1 khung giữa mỗi nhịp, ghép thành sheet và đối chiếu ảnh với câu; hai nhịp liền nhau phải khác hình rõ.
+- So 3–4 chỗ chuyển câu giữa `subs.ass` và `voice.wav`: phụ đề không được hiện trước tiếng quá 0,2 giây. Nghi ngờ thì đo khoảng lặng
+  trong `work/job_*/voice.wav` bằng `ffmpeg -af silencedetect`.
 
 ### 6. Bàn giao
 Báo: đường dẫn preview, kết quả kiểm, kết quả đọc nguội (còn hổng nào không), đề tài + nguồn, danh sách ảnh (tác giả/giấy phép nếu cần ghi), những gì chưa chắc.
 **Không tự xuất mp4 hoặc đăng.** Người dùng nói "xuất"/"đăng" mới làm.
+Khi xuất: dựng bản đầy đủ (bỏ `--preview`) vào `output/`, rồi xoá các bản preview trong `work/` (mp4 + khung/sheet tạm; giữ cache
+giọng). Kèm **caption** 3–5 câu: câu đầu đúng hook/sự kiện như video, 1–2 câu dữ kiện chốt, kết bằng câu hỏi mời bình luận;
+3–5 hashtag; chỉ dùng số liệu trong `SOURCES.txt`.
 
 ## Khi người dùng đưa kịch bản hoặc đoạn văn thô
 Giữ nguyên dữ kiện, viết lại theo mục 2 (đủ dài ~1 phút, nhóm hơi có phẩy, nhấn đúng chỗ), rồi làm tiếp từ bước 3. Hỏi lại chỉ khi thiếu dữ kiện
